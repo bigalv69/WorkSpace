@@ -1,8 +1,0 @@
-{
-    "editor.wordWrap": "on",
-    "terminal.integrated.accessibleViewFocusOnCommandExecution": true,
-    "terminal.integrated.allowMnemonics": true,
-    "terminal.integrated.copyOnSelection": true,
-    "terminal.integrated.defaultProfile.windows": "Command Prompt",
-    "terminal.integrated.enableImages": true
-}
