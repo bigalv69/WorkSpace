@@ -1,0 +1,9 @@
+# Release definitions shared across the Makefiles of this project
+# run make to generate version.inc
+
+MODULES_RELEASE := 5.4.0
+MODULES_BUILD_HASH := 820c788d
+MODULES_BUILD_REFS := HEAD -> main, tag: v5.4.0, xd/main, xd/HEAD
+MODULES_BUILD_FDATE := 2024-02-20 10:14:46 +0100
+MODULES_BUILD := @MODULES_BUILD@
+MODULES_BUILD_DATE := @MODULES_BUILD_DATE@

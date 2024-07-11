@@ -1,0 +1,380 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.51-scan/%M%
+#   Revision:		%I%
+#   First Edition:	2023/02/21
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:		paths
+#   Modulefiles:    scan
+#   Sub-Command:
+#
+#   Comment:	%C{
+#           Tests scan evaluation on paths sub-command
+#		}C%
+#
+##############################################################################
+
+skip_if_quick_mode
+
+set mp $modpath.4
+set mpre $modpathre.4
+setenv_path_var MODULEPATH $mp
+
+# ensure advanced version specifiers are enabled
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+
+# ensure paths tests have implicit default enabled
+setenv_var MODULES_IMPLICIT_DEFAULT 1
+
+
+#
+# symbolic version elements during scan
+#
+
+setenv_var TESTSUITE_SCAN sym1
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths foo=val3} $ans {}
+
+set tserr ".*
+Get modules: {source/source_file foo/unk scan scan/foo scan/unk scan/1.0 scan/2.0 scan/1.1 scan/2.1 scan/sym} matching 'foo=val3' in '$mpre'
+.*"
+testouterr_cmd_re sh {paths -T foo=val3} $ans $tserr
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd sh {paths foo=val4} $ans {}
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd sh {paths scan/sym foo=val4} $ans {}
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+set tserr ".*
+Get modules: {source/source_file foo/unk scan scan/unk scan/1.0 scan/1.1 scan/sym} matching 'foo=val4' in '$mpre'
+.*"
+testouterr_cmd_re sh {paths -T foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/1.0} matching 'scan@:1.0 foo=val4' in '$mpre'"
+testouterr_cmd_re sh {paths -T scan@:1.0 foo=val4} $ans $tserr
+
+# with global symbol
+setenv_var MODULERCFILE $env(TESTSUITEDIR)/etc/modulerc.scan
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd sh {paths foo=val4} $ans {}
+
+testouterr_cmd sh {paths scan/globalsym foo=val4} $ans {}
+
+testouterr_cmd sh {paths scan/globalsym foo=val5} OK {}
+
+# no extra match filter
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths scan} $ans {}
+
+set tserr ".*
+Get modules: {source/source_file foo/unk foo/globalunk scan scan/unk scan/1.0 scan/globalunk scan/1.1 scan/sym scan/globalsym} matching 'foo=val4' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/1.0} matching 'scan@:1.0 foo=val4' in '$mpre'"
+testouterr_cmd_re sh {paths -T scan@:1.0 foo=val4} $ans $tserr
+setenv_var MODULERCFILE $ORIG_MODULERCFILE
+
+
+#
+# default symbolic version during scan
+#
+
+setenv_var TESTSUITE_SCAN sym2
+
+set tserr ".*
+Get modules: {scan/1.1 scan/default scan scan/1.0} matching 'scan foo=val1' in '$mpre'
+Get modules: {scan scan/1.0} matching 'scan/1.0' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T scan foo=val1} $ans $tserr
+
+set tserr ".*
+Get modules: {scan/2.0 scan scan/2.1 scan/latest} matching 'scan foo=val4' in '$mpre'
+Get modules: {scan/2.1 scan} matching 'scan/2.1' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {} matching 'scan@default foo=val4' in '$mpre'"
+testouterr_cmd_re sh {paths -T scan@default foo=val4} OK $tserr
+
+set tserr ".*
+Get modules: {scan/default scan scan/1.0} matching 'scan@default foo=val2' in '$mpre'
+Get modules: {scan scan/1.0} matching 'scan/1.0' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T scan@default foo=val2} $ans $tserr
+
+set tserr ".*
+Get modules: {scan/2.0 scan/2.1 scan} matching 'scan@1.1:2.1 foo=val4' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@1.1:2.1 foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan/2.0 scan/1.1 scan} matching 'scan@1.1:2.0 foo=val2' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@1.1:2.0 foo=val2} $ans $tserr
+
+
+#
+# auto symbolic version during scan
+#
+
+setenv_var TESTSUITE_SCAN sym3
+
+set tserr ".*
+Get modules: {scan/1.1 scan scan/1.0} matching 'scan foo=val1' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T scan foo=val1} $ans $tserr
+
+set tserr ".*
+Get modules: {scan/2.0 scan scan/default scan/2.1 scan/latest} matching 'scan foo=val4' in '$mpre'
+Get modules: {scan/2.1 scan} matching 'scan/2.1' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/2.1 scan/default} matching 'scan@default foo=val4' in '$mpre'
+Get modules: {scan/2.1 scan} matching 'scan/2.1' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@default foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/2.1 scan/default} matching 'scan@default foo=val2' in '$mpre'
+Get modules: {scan/2.1 scan} matching 'scan/2.1' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@default foo=val2} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/2.1 scan/latest} matching 'scan@latest foo=val4' in '$mpre'
+Get modules: {scan/2.1 scan} matching 'scan/2.1' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@latest foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/2.1 scan/latest} matching 'scan@latest foo=val2' in '$mpre'
+Get modules: {scan/2.1 scan} matching 'scan/2.1' in '$mpre'
+.*"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@latest foo=val2} $ans $tserr
+
+set tserr ".*
+Get modules: {scan/2.0 scan} matching 'scan@1.1:2.0 foo=val4' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@1.1:2.0 foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan/2.0 scan/1.1 scan/2.1 scan} matching 'scan@1.1:2.1 foo=val2' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths -T scan@1.1:2.1 foo=val2} $ans $tserr
+
+
+#
+# alias element during scan
+#
+
+setenv_var TESTSUITE_SCAN alias1
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths foo=val3} $ans {}
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd sh {paths foo=val4} $ans {}
+
+# matching name, but no variant in an alias
+# FIXME: may change if resolution to target is applied on paths
+testouterr_cmd sh {paths scan/alias foo=val4} OK {}
+
+testouterr_cmd sh {paths scan/alias foo=val5} OK {}
+
+set tserr ".*
+Get modules: {source/source_file scan scan/1.0 scan/1.1} matching 'foo=val4' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T foo=val4} $ans $tserr
+
+# with global symbol
+setenv_var MODULERCFILE $env(TESTSUITEDIR)/etc/modulerc.scan
+
+testouterr_cmd sh {paths scan/glalias foo=val4} OK {}
+testouterr_cmd sh {paths scanalias foo=val4} OK {}
+
+# no extra match filter
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths scan} $ans {}
+
+set tserr ".*
+Get modules: {source/source_file scan scan/1.0 scan/1.1} matching 'foo=val4' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T foo=val4} $ans $tserr
+
+set tserr ".*
+Get modules: {scan scan/1.0} matching 'scan@:1.0 foo=val4' in '$mpre'"
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd_re sh {paths -T scan@:1.0 foo=val4} $ans $tserr
+setenv_var MODULERCFILE $ORIG_MODULERCFILE
+
+
+#
+# special chars
+#
+
+setenv_var TESTSUITE_SCAN special1
+
+testouterr_cmd sh {paths foo=*} OK {}
+testouterr_cmd sh {paths variant foo=*} OK {}
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths * foo=val2} $ans {}
+
+setenv_var MODULES_VARIANT_SHORTCUT foo=%
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths * %val2} $ans {}
+unsetenv_var MODULES_VARIANT_SHORTCUT
+
+setenv_var TESTSUITE_SCAN special2
+
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths * foo=val2} $ans {}
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+testouterr_cmd sh {paths * +foo} $ans {}
+
+
+#
+# error accessing modules
+#
+
+# disable module cache for these specific tests
+if {[info exists env(TESTSUITE_ENABLE_MODULECACHE)]} {
+    setenv_var MODULES_IGNORE_CACHE 1
+}
+
+# creating modules with no or incompatible header
+close [open $mp/scan/1.5 w]
+set fid [open $mp/scan/1.6 w]
+puts $fid {#%Module99}
+close $fid
+
+setenv_var TESTSUITE_SCAN access1
+
+set ans [list]
+lappend ans [list text $mp/scan/1.0]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths scan foo=val2} $ans {}
+
+testouterr_cmd sh {paths scan@1.5 foo=val2} OK {}
+testouterr_cmd sh {paths scan@1.6 foo=val2} OK {}
+
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths scan@1.2:2.0 foo=val2} $ans {}
+
+file delete $mp/scan/1.5
+file delete $mp/scan/1.6
+
+# cannot test access if cannot change file permission
+if {!$is_file_perms_editable} {
+    send_user "\tskipping access tests as file permissions cannot be changed\n"
+# cannot test access if superuser privileges are in use
+} elseif {$tcl_platform(user) eq "root"} {
+    send_user "\tskipping access tests as tests are run by superuser\n"
+# cannot test access if restricted file permissions have no effect
+} elseif {$is_locked_dir_file_readable && $is_locked_file_readable} {
+    send_user "\tskipping access tests as locked files or directories are still readable\n"
+} else {
+
+change_file_perms $mp/scan/1.0 ugo-r
+
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths scan foo=val2} $ans {}
+
+testouterr_cmd sh {paths scan@1.0 foo=val2} OK {}
+
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd_re sh {paths scan@1.1:2.0 foo=val2} $ans {}
+
+restore_file_perms $mp/scan/1.0
+
+}
+
+if {[info exists env(TESTSUITE_ENABLE_MODULECACHE)]} {
+    unsetenv_var MODULES_IGNORE_CACHE
+}
+
+
+#
+# same variant specified several times
+#
+
+setenv_var TESTSUITE_SCAN variant1
+
+set ans [list]
+lappend ans [list text $mp/scan/2.0]
+testouterr_cmd sh {paths scan foo=val1 foo=val2} $ans {}
+testouterr_cmd sh {paths scan foo=val1 foo=val4 foo=val2} OK {}
+testouterr_cmd sh {paths scan foo=val2 foo=val4} OK {}
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

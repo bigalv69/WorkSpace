@@ -1,0 +1,20 @@
+#%Module
+
+module-whatis [module-info name]
+
+if {[info exists env(TESTSUITE_KEEP_LOADED)]} {
+    switch -- $env(TESTSUITE_KEEP_LOADED) {
+        load1 - coll49 - coll49forb - coll49keep {
+            module load --tag=keep-loaded foo/1.0
+        }
+        prereq1 {
+            prereq --tag=keep-loaded foo/1.0
+        }
+        switch1 {
+            module switch --tag=keep-loaded bar foo/1.0
+        }
+        allo1 {
+            always-load --tag=keep-loaded foo/1.0
+        }
+    }
+}

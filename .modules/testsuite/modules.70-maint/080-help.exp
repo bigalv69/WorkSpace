@@ -1,0 +1,172 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.70-maint/%M%
+#   Revision:		%I%
+#   First Edition:	95/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		help
+#   Modulefiles:	help/2.0, bad
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests the module command 'help'
+#			Help w/o arguments is checked during the testsuites
+#			initialization phase, when probing the release of
+#			modulecmd.
+#			add test regarding the redirection of stdout 
+#			help/2.0 => puts stdout
+#			help/3.0 => puts stderr
+#			both should provide the same stderr output
+#		}C%
+#
+##############################################################################
+
+# skip tests if implicit_default option could not be overridden
+if {[is_config_locked implicit_default]} {
+    send_user "\tskipping tests as implicit_default could not be overridden\n"
+} else {
+
+# ensure avail tests have implicit default enabled
+setenv_var MODULES_IMPLICIT_DEFAULT 1
+
+#
+#  The affected module file
+#
+
+set module "help/2.0"
+set modulefile "$modpath/$module"
+set modulefile_reld "$reldmodpath/$module"
+set modulefile_reldd "$relddmodpath/$module"
+
+# different behavior than C-version: on Tcl-version 'module-log', 'module-verbosity'
+# and 'module-user' commandq are not handled and will always return a warning message
+# to inform the user.
+set err_help "$modlin
+Module Specific Help for $modpathre/$module:
+
+Help_out
+Help_err
+$modlin"
+set err_debug_help "((DEBUG|Evaluate modulerc:|Evaluate modulefile:|Get modules:) .*)+
+$modlin
+.*Module Specific Help for $modpathre/$module:
+
+((DEBUG|Evaluate modulerc:|Evaluate modulefile:|Get modules:) .*)+
+DEBUG \\\[#1:help:$module\\\] evaluateModulefile: puts stderr Help_out
+.*Help_out.*
+DEBUG \\\[#1:help:$module\\\] evaluateModulefile: puts stderr Help_err
+.*Help_err.*
+(DEBUG .*)+
+$modlin
+(DEBUG .*)+"
+set err_debug2_help "((DEBUG|Evaluate modulerc:|Evaluate modulefile:|Get modules:) .*)+
+$modlin
+.*Module Specific Help for $modpathre/$module:
+
+((DEBUG|Evaluate modulerc:|Evaluate modulefile:|Get modules:) .*)+
+DEBUG \\\[#1:help:$module\\\] evaluateModulefile: putsModfileCmd __modfile_help_0_1 stderr Help_out
+.*Help_out.*
+DEBUG \\\[#1:help:$module\\\] evaluateModulefile: putsModfileCmd __modfile_help_0_1 stderr Help_err
+.*Help_err.*
+(DEBUG .*)+
+$modlin
+(DEBUG .*)+"
+
+set module_2 "bad"
+set out_interr "[escre [msg_moderr "$msg_invcmdname \"bad-command\"" bad-command $modpath/$module_2/.modulerc 28 {  }]]
+$modlin
+Module Specific Help for $modpathre/$module_2/before:
+
+[escre [msg_moderr "$msg_invcmdname \"bad-command\"" bad-command $modpath/$module_2/before 26 {  }]]
+$modlin"
+
+set module_3 "bad2"
+set custom {    (procedure "ModulesHelp" line 2)
+    invoked from within
+"ModulesHelp"}
+set custom [escre [msg_moderr "$msg_invcmdname \"bad-command\"" bad-command $modpath/$module_3/proc {} {  } {} {} $custom]]
+set modulefile_3 "$modpath/$module_3/proc"
+set modulefile_3_reld "$reldmodpath/$module_3/proc"
+set modulefile_3_reldd "$relddmodpath/$module_3/proc"
+set out_interr_3 "$modlin
+Module Specific Help for $modpathre/$module_3/proc:
+
+$custom
+$modlin"
+
+set module_4 "NonExistent"
+set out_err_4 "$err_path'$module_4'"
+
+
+#
+#  The tests
+#
+
+# different behavior than C-version: on Tcl-version 'stdout' output made in a
+# ModulesHelp procedure is not redirected to stderr and will produce an error
+# as output will be parsed by the underlying shell. So for this test $module
+# has been adapted to output everything to stderr
+
+# test stderr output
+testouterr_cmd_re "sh" "help $module" "OK" "$err_help"
+
+skip_if_quick_mode
+
+# test with module passed as full path
+if {$plus_in_modpath && $install_advversspec eq {y}} {
+    setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+}
+testouterr_cmd_re "sh" "help $modulefile" "OK" "$err_help"
+testouterr_cmd_re "sh" "help $modulefile_reld" "OK" "$err_help"
+testouterr_cmd_re "sh" "help $modulefile_reldd" "OK" "$err_help"
+if {$plus_in_modpath && $install_advversspec eq {y}} {
+    unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+}
+
+# test debug mode
+testouterr_cmd_re "sh" "-D help $module" "OK" "$err_debug_help"
+# test multiple debug argument: sets debug2 mode which change result a bit
+setenv_var MODULES_AUTO_HANDLING 0
+testouterr_cmd_re "sh" "--debug help $module -D" "OK" "$err_debug2_help"
+unsetenv_var MODULES_AUTO_HANDLING
+
+# test stdout output: MUST be empty
+test_cmd "sh" "help $module" "OK"
+
+# test with erroneous modulefile
+testouterr_cmd_re "sh" "help $module_2" "ERR" "$out_interr"
+
+# test with erroneous ModulesHelp proc in modulefile
+testouterr_cmd_re "sh" "help $module_3" "ERR" "$out_interr_3"
+# test with module passed as full path
+if {$plus_in_modpath && $install_advversspec eq {y}} {
+    setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+}
+testouterr_cmd_re "sh" "help $modulefile_3" "ERR" "$out_interr_3"
+testouterr_cmd_re "sh" "help $modulefile_3_reld" "ERR" "$out_interr_3"
+testouterr_cmd_re "sh" "help $modulefile_3_reldd" "ERR" "$out_interr_3"
+if {$plus_in_modpath && $install_advversspec eq {y}} {
+    unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+}
+
+# test on unexistant modulefile
+testouterr_cmd "sh" "help $module_4" "ERR" "$out_err_4"
+
+# check error when implicit default is disabled
+setenv_var MODULES_IMPLICIT_DEFAULT 0
+testouterr_cmd sh "help $module_3" ERR "$err_nodefault'$module_3'"
+setenv_var MODULES_IMPLICIT_DEFAULT 1
+
+#
+#  Cleanup
+#
+
+reset_test_env
+
+}

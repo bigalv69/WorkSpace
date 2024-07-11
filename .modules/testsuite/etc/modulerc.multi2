@@ -1,0 +1,3 @@
+#%Module
+module-alias foo/alias foo/4.0
+module-tag mytag foo/1.0

@@ -1,0 +1,161 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	2018/10/14
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		nanobowers <nanobowers@gmail.com>
+#
+#   Description:	Testsuite testsequence
+#   Command:		load
+#   Modulefiles:	function/1.0 function/2.0
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests 'set-function' command
+#		}C%
+#
+##############################################################################
+
+# ensure auto symbolic versions are not set for these tests
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+
+#
+#  Variables. This test forces a module load command. It will result in the
+#    environment variables "_LMFILES_", "LOADEDMODULES" and "testsuite" to
+#    be set up
+#
+
+set module "function/1.0"
+set modulefile "$modpath/$module"
+
+# strictly speaking, this function is only valid for sh shells, not fish
+set function_sh {eval $(echo cd $1)}
+set function2_sh {echo $1}
+set function3_sh {echo $1
+    echo $2}
+set function_fish {eval (echo cd $argv[1])}
+set function2_fish {echo $argv[1]}
+set function3_fish {echo $argv[1]
+    echo $argv[2]}
+
+#
+#  For the different shells ...
+#
+
+#lappend ans_empty [list function testsuite $function]
+lappend ans_empty [list set __MODULES_LMREFRESH $module]
+lappend ans_empty [list set _LMFILES_ $modulefile]
+lappend ans_empty [list set LOADEDMODULES $module]
+
+lappend ans_sh [list set __MODULES_LMREFRESH $module]
+lappend ans_sh [list set _LMFILES_ $modulefile]
+lappend ans_sh [list set LOADEDMODULES $module]
+lappend ans_sh [list testsuite2 "() {" "$function2_sh; };"]
+lappend ans_sh [list testsuite3 "() {" "$function2_sh; };"]
+lappend ans_sh [list testsuite4 "() {" "$function2_sh; };"]
+lappend ans_sh [list testsuite "() {" "$function_sh; };"]
+lappend ans_sh [list testsuite5 "() {" "$function3_sh; };"]
+
+lappend ans_bash [list set __MODULES_LMREFRESH $module]
+lappend ans_bash [list set _LMFILES_ $modulefile]
+lappend ans_bash [list set LOADEDMODULES $module]
+lappend ans_bash [list testsuite2 "() {" "$function2_sh; };" "export -f testsuite2;"]
+lappend ans_bash [list testsuite3 "() {" "$function2_sh; };" "export -f testsuite3;"]
+lappend ans_bash [list testsuite4 "() {" "$function2_sh; };" "export -f testsuite4;"]
+lappend ans_bash [list testsuite "() {" "$function_sh; };" "export -f testsuite;"]
+lappend ans_bash [list testsuite5 "() {" "$function3_sh; };" "export -f testsuite5;"]
+
+lappend ans_fish [list set __MODULES_LMREFRESH $module]
+lappend ans_fish [list set _LMFILES_ $modulefile]
+lappend ans_fish [list set LOADEDMODULES $module]
+lappend ans_fish [list function "testsuite2;" "$function2_fish;" "end;"]
+lappend ans_fish [list function "testsuite3;" "$function2_fish;" "end;"]
+lappend ans_fish [list function "testsuite4;" "$function2_fish;" "end;"]
+lappend ans_fish [list function "testsuite;" "$function_fish;" "end;"]
+lappend ans_fish [list function "testsuite5;" "$function3_fish;" "end;"]
+
+lappend ans_unsh [list set _LMFILES_ $modulefile]
+lappend ans_unsh [list set LOADEDMODULES $module]
+lappend ans_unsh [list unset "-g" testsuite]
+
+#
+#  set-function test via load
+#
+
+foreach sh $supported_shells {
+    # only available for fish and sh derivatives
+    # other shells do not get output for 'set-function'
+    if {$sh eq "fish"} {
+        test_cmd "$sh" "load $module" $ans_fish
+    } elseif {$sh eq {bash}} {
+        test_cmd "$sh" "load $module" $ans_bash
+    } elseif { [lsearch {sh ksh zsh} $sh] >= 0 } {
+        test_cmd "$sh" "load $module" $ans_sh
+    } else {
+        test_cmd "$sh" "load $module" $ans_empty
+    }
+}
+
+skip_if_quick_mode
+
+#
+# Test special characters handling.
+# Currently we are not hacking the function-string.
+# Recommended use is to use {} for quoting the function body
+#
+
+set module "function/2.0"
+set modulefile "$modpath/$module"
+
+set function_sh {echo $(grep "report .Modules " modulecmd.tcl | tr -d \\ | awk '{print $3}'); echo $1}
+set function_fish {echo (grep "report .Modules " modulecmd.tcl | tr -d \\ | awk '{print $3}'); echo $argv[1]}
+
+set ans_empty [list]
+lappend ans_empty [list set __MODULES_LMREFRESH $module]
+lappend ans_empty [list set _LMFILES_ $modulefile]
+lappend ans_empty [list set LOADEDMODULES $module]
+
+set ans_sh [list]
+lappend ans_sh [list set __MODULES_LMREFRESH $module]
+lappend ans_sh [list set _LMFILES_ $modulefile]
+lappend ans_sh [list set LOADEDMODULES $module]
+lappend ans_sh [list testsuite "() {" "$function_sh; };"]
+
+set ans_bash [list]
+lappend ans_bash [list set __MODULES_LMREFRESH $module]
+lappend ans_bash [list set _LMFILES_ $modulefile]
+lappend ans_bash [list set LOADEDMODULES $module]
+lappend ans_bash [list testsuite "() {" "$function_sh; };" "export -f testsuite;"]
+
+set ans_fish [list]
+lappend ans_fish [list set __MODULES_LMREFRESH $module]
+lappend ans_fish [list set _LMFILES_ $modulefile]
+lappend ans_fish [list set LOADEDMODULES $module]
+lappend ans_fish [list function "testsuite;" "$function_fish;" "end;"]
+
+
+
+foreach sh $supported_shells {
+    switch -- $sh {
+        {bash} {
+            test_cmd $sh "load $module" $ans_bash
+        }
+        {sh} - {ksh} - {zsh} {
+            test_cmd $sh "load $module" $ans_sh
+        }
+        {fish} {
+            test_cmd $sh "load $module" $ans_fish
+        }
+    }
+}
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

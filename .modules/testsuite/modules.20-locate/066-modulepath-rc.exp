@@ -1,0 +1,94 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.20-locate/%M%
+#   Revision:		%I%
+#   First Edition:	2018/12/09
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:		load, display, whatis, paths
+#   Modulefiles:	loc_rc1/1.0
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests the evaluation of modulepath rc file
+#		}C%
+#
+##############################################################################
+
+set mp "$modpath.rc"
+
+# setup specific environment
+setenv_path_var MODULEPATH $mp
+
+
+# test regular alias/version/virtual definitions made from modulepath rc
+set ans [list]
+if {[is_conf_enabled advversspec implicitdefault]} {
+    lappend ans [list set __MODULES_LMALTNAME bar/1&bar/top&bar/dfl&al|bar/3&as|bar/default&as|bar/latest]
+} else {
+    lappend ans [list set __MODULES_LMALTNAME bar/1&bar/top&bar/dfl&al|bar/3]
+}
+lappend ans [list set _LMFILES_ $mp/bar/1]
+lappend ans [list set LOADEDMODULES bar/1]
+testouterr_cmd sh {load bar/top} $ans {}
+testouterr_cmd sh {load bar/3} $ans {}
+
+skip_if_quick_mode
+
+set ans [list]
+if {[is_conf_enabled advversspec implicitdefault]} {
+    lappend ans [list set __MODULES_LMALTNAME foo/2&al|foo/lat&as|foo/default&as|foo/latest]
+} else {
+    lappend ans [list set __MODULES_LMALTNAME foo/2&al|foo/lat]
+}
+lappend ans [list set _LMFILES_ $mp/foo/.common]
+lappend ans [list set LOADEDMODULES foo/2]
+testouterr_cmd sh {load foo/lat} $ans {}
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/foo/.common]
+lappend ans [list set LOADEDMODULES foo/1]
+testouterr_cmd sh {load foo/1} $ans {}
+
+# test definitions pointing to non-existent modulefile
+testouterr_cmd sh {load bar/unk} ERR "$err_path'bar/4'"
+testouterr_cmd sh {load unk} ERR "$err_path'bar/4'"
+testouterr_cmd sh {load foo/3} ERR "$err_file'$mp/foo/unk'"
+
+# ensure a .version file at modulepath root is ignored
+testouterr_cmd sh {load default} ERR "$err_path'default'"
+testouterr_cmd sh {load plain/default} ERR "$err_path'plain/default'"
+
+# test use of shorthand version notation in modulepath rc
+setenv_var TS_BAD_SHORTHAND_VERSION 1
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/foo/.common]
+lappend ans [list set LOADEDMODULES foo/1]
+lappend ans [list ERR]
+testouterr_cmd sh {load foo/1} $ans "$error_msgs: Invalid modulename '/1' found\n$error_msgs: Invalid modulename '/2' found\n$error_msgs: Invalid modulename '/3' found"
+
+# test badly written modulepath rc file
+if {[cmpversion $tclsh_version 8.6] == -1} {
+    set custom "    invoked from within
+\"if {\[info exists ::env(TS_BAD_COMMAND_TEST)\]} {
+    badcommand
+}\""
+    set tserr [msg_moderr "$msg_invcmdname \"badcommand\"" {badcommand} $mp/.modulerc 4 {  } {} {} $custom]
+    unset custom
+} else {
+    set tserr [msg_moderr "$msg_invcmdname \"badcommand\"" {badcommand} $mp/.modulerc 5 {  }]
+}
+unsetenv_var TS_BAD_SHORTHAND_VERSION
+setenv_var TS_BAD_COMMAND_TEST 1
+testouterr_cmd sh {load bar/top} ERR $tserr\n$err_path'bar/top'
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

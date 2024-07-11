@@ -1,0 +1,71 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:       modules.00-init/%M%
+#   Revision:       %I%
+#   First Edition:  2017/05/19
+#   Last Mod.:      %U%, %G%
+#
+#   Authors:        Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:    Testuite testsequence
+#   Command:
+#   Sub-Command:
+#
+#   Comment:    %C{
+#           Check basic set of module commands on all shells
+#           when module is initialized via 'autoinit' sub-command
+#       }C%
+#
+##############################################################################
+
+
+set bad_cmd "$error_msgs: Invalid command 'foo'"
+
+#
+# The tests
+#
+
+if {$verbose} {
+   send_user "\tChecking basic set of module commands\n"
+}
+
+foreach shell $shell_list {
+   testall_cmd_re "autoinit:$shell" "module --version" {} "Modules Release \\S+ (\\S+)" 0
+   testall_cmd "autoinit:$shell" "module foo" "" "$bad_cmd\n$type_help" 1
+   testall_cmd "autoinit:$shell" "module use $contrib_modpath\; module purge\; module load null\; module list -t" "" "$cur_loaded\nnull" 0
+   testall_cmd "autoinit:$shell" "module use $contrib_modpath\; module purge\; module load null\; module unload null\; module list -t" "" "$no_loaded" 0
+}
+
+if {$install_ml eq {y}} {
+   foreach shell $shell_list {
+      testall_cmd_re "autoinit:$shell" "ml --version" {} "Modules Release \\S+ (\\S+)" 0
+      testall_cmd "autoinit:$shell" "ml foo" "" "$error_msgs: Unable to locate a modulefile for 'foo'" 1
+      testall_cmd "autoinit:$shell" "ml use $contrib_modpath\; ml purge\; ml null\; ml list -t" "" "$cur_loaded\nnull" 0
+      testall_cmd "autoinit:$shell" "ml use $contrib_modpath\; ml purge\; ml null\; ml -null\; ml" "" "$no_loaded" 0
+   }
+}
+
+
+# test loaded module refresh performed during autoinit
+setenv_path_var MODULEPATH $testsuite_modpath.3
+setenv_loaded_module [list refresh/4.0] [list $testsuite_modpath.3/refresh/4.0]
+setenv_var __MODULES_LMREFRESH refresh/4.0
+
+foreach shell $shell_list {
+   if {$shell in {csh tcsh}} {
+      testall_cmd "autoinit:$shell" "alfoo" "foo4" "" 0
+   } else {
+      testall_cmd "autoinit:$shell" "alfoo; funcfoo" "foo4\nfoo4" "" 0
+   }
+}
+
+
+#
+#  Clean up variables used in this test case
+#
+
+reset_test_env
+
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

@@ -1,0 +1,129 @@
+##############################################################################
+#   Modules Release Tcl
+#   Providing a flexible user environment
+#
+#   File:		modules.61-coll/%M%
+#   Revision:		%I%
+#   First Edition:	2016/08/09
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:
+#   Modulefiles:
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Test the module 'saverm' command
+#		}C%
+#
+##############################################################################
+
+
+set cbadnerrmsg [err_coll_notfound $collbadn]
+set cbadterrmsg [err_coll_notfound $colld $colltarget]
+set c1fperrmsg "$error_msgs: Command does not remove collection specified as filepath"
+set rmcderrmsg "couldn't open \"$hometestdotmod/default\": no such file or directory"
+set rmc1errmsg "couldn't open \"$hometestdotmod/$coll1\": no such file or directory"
+set rmc4ferrmsg "couldn't open \"$hometestdotmod/$coll4f\": no such file or directory"
+set rmc48errmsg "couldn't open \"$hometestdotmod/$coll48\": no such file or directory"
+
+#
+# test removing nonexistent collection
+#
+
+# set home to directory where collections have been
+# recorded during the 030-save tests. try the saverm
+# command on these tests collections.
+if {$verbose} {
+    send_user "\tSetup HOME = $hometestcoll\n"
+}
+set env(HOME) "$hometestcoll"
+
+testouterr_cmd "ALL" "saverm $collbadn" "ERR" "$cbadnerrmsg"
+
+
+#
+# test removing default collection
+#
+
+# test only sh shell as this test does not produce shell output
+testoutfile_cmd "sh" "saverm" "OK" "$hometestdotmod/default" "$rmcderrmsg"
+
+skip_if_quick_mode
+
+#
+# test removing named collection
+#
+
+# test only sh shell as this test does not produce shell output
+testoutfile_cmd "sh" "saverm $coll1" "OK" "$hometestdotmod/$coll1" "$rmc1errmsg"
+
+
+#
+# test removing collection specified as filepath
+# should raise an error, saverm is not made to delete filepath
+#
+
+testouterr_cmd "ALL" "saverm $coll1fp" "ERR" "$c1fperrmsg"
+
+
+#
+# test removing collection requiring an upcoming version of Modules
+# test effect of mcookie configuration with this collection
+#
+
+file copy $coll48fp $hometestdotmod/$coll48
+testoutfile_cmd sh "saverm $coll48" OK $hometestdotmod/$coll48 $rmc48errmsg
+
+file copy $coll48fp $hometestdotmod/$coll48
+setenv_var MODULES_MCOOKIE_CHECK eval
+testoutfile_cmd sh "saverm $coll48" OK $hometestdotmod/$coll48 $rmc48errmsg
+setenv_var MODULES_MCOOKIE_CHECK always
+
+file copy $coll48fp $hometestdotmod/$coll48
+setenv_var MODULES_MCOOKIE_VERSION_CHECK 0
+testoutfile_cmd sh "saverm $coll48" OK $hometestdotmod/$coll48 $rmc48errmsg
+setenv_var MODULES_MCOOKIE_VERSION_CHECK 1
+
+
+#
+# test removing named collection when MODULES_COLLECTION_TARGET is set
+#
+
+# setup environment state
+if {$verbose} {
+    send_user "\tSetup MODULES_COLLECTION_TARGET = $colltarget\n"
+}
+set env(MODULES_COLLECTION_TARGET) "$colltarget"
+
+# test only sh shell as this test does not produce shell output
+testoutfile_cmd "sh" "saverm $coll4" "OK" "$hometestdotmod/$coll4f" "$rmc4ferrmsg"
+
+
+#
+# test removing nonexistent default collection when
+# MODULES_COLLECTION_TARGET is set
+#
+
+testouterr_cmd "ALL" "saverm" "ERR" "$cbadterrmsg"
+
+
+#
+# test unsetting HOME
+#
+
+if {$verbose} {
+    send_user "\tUnset HOME \n"
+}
+unset env(HOME)
+
+testouterr_cmd "sh" "saverm" "ERR" $nohomeerrmsg
+
+
+#
+# Cleanup
+#
+
+reset_test_env

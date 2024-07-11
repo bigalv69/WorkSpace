@@ -1,0 +1,621 @@
+# enable siteconfig content only if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG)]} {
+
+# force stderr terminal attachment state
+proc initStateIsStderrTty {} {
+   return 1
+}
+
+# enable debug mode if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_DEBUG)]} {
+   set asked_verbosity debug
+}
+
+# call a non-existent procedure to raise error if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_BROKEN)]} {
+   unk_foo
+}
+
+# redefine existing modulecmd.tcl procedure to make it broken
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_BROKEN2)]} {
+   proc reportVersion {} {
+     unk_foo
+   }
+}
+
+# unset existing modulecmd.tcl procedure
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_BROKEN3)]} {
+   rename ::reportVersion {}
+}
+
+# generate error with parseAccessIssue generic msg if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_ACCESSERR)]} {
+   set errorCode "Custom error code"
+   error [parseAccessIssue "foo"]
+}
+
+# try element list display in terse+numbered mode if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TERSENUM)]} {
+   displayElementList test {} terse 1 1 1 [list elt1 elt2 elt3]
+}
+
+# try element list display with a tricky list that triggers unusual condition in displayElementList proc
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TRICKYLISTDISP)]} {
+   # set a specific terminal column number to fall in tricky condition
+   set orig_term_columns [getState term_columns]
+   setState term_columns 80
+   set max_len 0
+   foreach elt [list abc/def abcdefgh/ijklmnop abc/defg abcd/ef abc/defg-hijkl.mn.op abcdefgh/ijklm.nopqrst abcdefg/hijklmnop-qr.st.uvw abcdefgh/ijklmnopqrst-u-vwxy.zA-BCD-E abcdef/ghijklm-nopq.r_st.uv abcdefgh/ijklmnop-q-rstu.vw-xyz-A abcdefg/hijklmn-op.qr.stu abcdefg/hijkl-mn.op.qrs abcd/efgh-ij.k abcdefg/hijk-lmnop_qr.st.uvw abcdef/ghijklmno-p.q.r abcdefgh/ijklmn-o-pqrs.tu abcdefgh/ijklmnop-q-rstu.vw-xyz abcdefg/hij-klm.nopq abcdefg/hij-kl.mn.opq abcdefgh/ijklmnopq_rstuv-w-xyzA.BC-DEF abcdefgh/ijklmnopqrstuv-w-xyzA.BC abcdefgh/ij-k-lmno.pq abcdefgh/ijk-l-mnop.qr-stu abcdefgh/ijklmnop-qr.st abcdef/ghijklmno-pq.rs abcdef/ghi-jklm_no_pqrstuv abcdefgh/ijk-lm-n-opqr.st abcdefgh/ijklm-n-opqr.st-uvw abcdef/ghijklm-nopq_r abcdefg/hijkl-mn.op.qzs abcdefg/hijklmn-op.qr.stz abcdefgh/ijklmn] {
+      lappend display_list $elt
+      lappend len_list [string length $elt]
+      if {[string length $elt] > $max_len} {
+         set max_len [string length $elt]
+      }
+   }
+   displayElementList test {} terse 0 1 1 $display_list $len_list $max_len
+   setState term_columns $orig_term_columns
+}
+
+
+# use loaded module accessor on non-loaded module if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_LMACCESSOR)]} {
+   report [getModulefileFromLoadedModule "foo"]
+   report [getModuleFromLoadedModulefile "/path/to/foo"]
+   report [getModuleFromLoadingModulefile "/path/to/foo"]
+}
+
+# fake Solaris stty if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_SOLARIS_STTY)]} {
+   set tcl_platform(os) "SunOS"
+   set env(PATH) "$env(TESTSUITEDIR):$env(PATH)"
+}
+
+# fake Windows mode if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_WINDOWS_MODE)]} {
+   set tcl_platform(os) "Windows NT"
+   set env(PATH) "$env(TESTSUITEDIR):$env(PATH)"
+}
+
+# fake Windows platform if following environment variable is set
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_WINDOWS_PLATFORM)]} {
+   set tcl_platform(platform) "windows"
+}
+
+# test getDiffBetweenList procedure with element of second list arg not in first list arg
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETDIFFBETWEENLIST)]} {
+   report [getDiffBetweenList [list same foo foo2] [list same bar bar2]]
+}
+
+# test getDiffBetweenArray procedure with element of first list arg with empty value
+# not in second list arg (notset_equals_empty option enabled)
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETDIFFBETWEENARRAY)]} {
+   array set arr1 [list same {} foo val]
+   array set arr2 [list foo val]
+   report [getDiffBetweenArray arr1 arr2 1]
+}
+
+# test twice calls to getConf term_background and getConf colors procedures
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TWICEINITCOLORS)]} {
+    getConf term_background
+    getConf term_background
+    getConf colors
+    getConf colors
+}
+
+# test clear sub-command confirmation message without waiting indefinitely
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXITONGETSSTDIN)]} {
+    rename ::gets ::__gets
+    proc gets {fid} {
+        if {$fid eq {stdin}} {
+            exit 0
+        } else {
+            return [__gets $fid]
+        }
+    }
+}
+
+# test extra siteconfig disablement
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_NOEXTRASITECONFIG)]} {
+    lappendConf locked_configs extra_siteconfig
+}
+
+# test Tcl ext lib load by a Tcl interpreter < 8.5
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBLOAD83)]} {
+    # call an external Tcl shell to just attempt to load lib in it (as
+    # modulecmd.tcl is not compatible with Tcl<8.5)
+    exec ./tclsh83 << "load [getConf tcl_ext_lib] Envmodules"
+}
+
+# test tcl ext lib procedures against erroneous calls
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBBADCALL)]} {
+    set badcalllist [list readFile {readFile foo bar} {readFile foo 0 bar}\
+        {readFile foo 0 0 0} getFilesInDirectory {getFilesInDirectory foo bar}]
+    foreach badcall $badcalllist {
+        if {[catch {[eval $badcall]} errMsg]} {
+            reportError $errMsg
+        }
+    }
+}
+
+# test tcl ext lib procedures against a failed closedir call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDCLOSEDIR)]} {
+    if {[catch {[getFilesInDirectory $env(TESTSUITEDIR)/modulefiles 0]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures against a failed getpwduid call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDGETPWUID)]} {
+    if {[catch {[initStateUsername]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures against a failed getgroups call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDGETGROUPS)]} {
+    if {[catch {[initStateUsergroups]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures against a zero result getgroups call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIB0GETGROUPS)]} {
+    report [initStateUsergroups]
+}
+
+# test tcl ext lib procedures against a duplicate entries in result getgroups call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBDUPGETGROUPS)]} {
+    report [initStateUsergroups]
+}
+
+# test tcl ext lib procedures against a failed getgrgid call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDGETGRGID)]} {
+    if {[catch {[initStateUsergroups]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures against a failed sysconf call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDSYSCONF)]} {
+    if {[catch {[initStateUsergroups]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures against a failed time call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDTIME)]} {
+    if {[catch {[initStateClockSeconds]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures called without argument
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_PARSEDATETIMEARG_NOARG)]} {
+    if {[catch {[parseDateTimeArg]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures against a failed mktime call
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_TCLEXTLIBFAILEDMKTIME)]} {
+    if {[catch {[parseDateTimeArg --before 2020-09-18]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# test tcl ext lib procedures called with badly formatted date
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_PARSEDATETIMEARG_BADDATE)]} {
+    if {[catch {[parseDateTimeArg --before 2020-09-19U20:00]} errMsg]} {
+        reportError $errMsg
+    }
+}
+
+# specific tests to improve modEq procs coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_MODEQ)]} {
+    # psuf tests
+    report [modEqProc foo foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProc bar foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProc foo foo/bar match 1 0 0 0 /*]
+    report [modEqProc bar foo/bar match 1 0 0 0 /*]
+    report [modEqProc foo/ foo/bar match 1 0 0 0 /*]
+    report [modEqProcIcase Foo foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProcIcase Bar foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProcIcase Foo foo/bar match 1 0 0 0 /*]
+    report [modEqProcIcase Bar foo/bar match 1 0 0 0 /*]
+    report [modEqProcIcase Foo/ foo/bar match 1 0 0 0 /*]
+    report [modEqProcExtdfl foo foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProcExtdfl bar foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProcExtdfl foo foo/bar match 1 0 0 0 /*]
+    report [modEqProcExtdfl bar foo/bar match 1 0 0 0 /*]
+    report [modEqProcExtdfl foo/ foo/bar match 1 0 0 0 /*]
+    report [modEqProcIcaseExtdfl Foo foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProcIcaseExtdfl Bar foo/bar eqstart 1 0 0 0 /*]
+    report [modEqProcIcaseExtdfl Foo foo/bar match 1 0 0 0 /*]
+    report [modEqProcIcaseExtdfl Bar foo/bar match 1 0 0 0 /*]
+    report [modEqProcIcaseExtdfl Foo/ foo/bar match 1 0 0 0 /*]
+    # matchin tests
+    report [modEqProc oo/bar foo/bar matchin 1]
+    report [modEqProc aa foo/bar matchin 1]
+    report [modEqProc oo foo/bar matchin 1 0 0 0 /*]
+    report [modEqProcIcase Oo/bar foo/bar matchin 1]
+    report [modEqProcIcase Aa foo/bar matchin 1]
+    report [modEqProcIcase Oo foo/bar matchin 1 0 0 0 /*]
+    report [modEqProcExtdfl oo/bar foo/bar matchin 1]
+    report [modEqProcExtdfl aa foo/bar matchin 1]
+    report [modEqProcExtdfl oo foo/bar matchin 1 0 0 0 /*]
+    report [modEqProcIcaseExtdfl Oo/bar foo/bar matchin 1]
+    report [modEqProcIcaseExtdfl Aa foo/bar matchin 1]
+    report [modEqProcIcaseExtdfl Oo foo/bar matchin 1 0 0 0 /*]
+    defineParseModuleSpecificationProc [getConf advanced_version_spec]
+    parseModuleSpecification 0 0 0 0 foo@1.1:1.3
+    parseModuleSpecification 0 0 0 0 oo@1.1:1.3
+    parseModuleSpecification 0 0 0 0 Oo@1.1:1.3
+    parseModuleSpecification 0 0 0 0 fOo@1.1:1.3
+    defineModVersCmpProc 0 0
+    report [modEqProc oo@1.1:1.3 foo/1.2 matchin]
+    report [modEqProc oo@1.1:1.3 foo/1.4 matchin]
+    report [modEqProc foo@1.1:1.3 fooo/1.3 matchin]
+    defineModVersCmpProc 1 0
+    report [modEqProcIcase Oo@1.1:1.3 foo/1.2 matchin]
+    report [modEqProcIcase Oo@1.1:1.3 foo/1.4 matchin]
+    report [modEqProcIcase fOo@1.1:1.3 fooo/1.3 matchin]
+    defineModVersCmpProc 0 1
+    report [modEqProcExtdfl oo@1.1:1.3 foo/1.2.2 matchin]
+    report [modEqProcExtdfl oo@1.1:1.3 foo/1.4.5 matchin]
+    report [modEqProcExtdfl foo@1.1:1.3 fooo/1.3.1 matchin]
+    defineModVersCmpProc 1 1
+    report [modEqProcIcaseExtdfl Oo@1.1:1.3 foo/1.2.2 matchin]
+    report [modEqProcIcaseExtdfl Oo@1.1:1.3 foo/1.4.5 matchin]
+    report [modEqProcIcaseExtdfl fOo@1.1:1.3 fooo/1.3.1 matchin]
+    parseModuleSpecification 0 0 0 0 foo?bar@1.1:1.3
+    parseModuleSpecification 0 0 0 0 o?bar@1.1:1.3
+    parseModuleSpecification 0 0 0 0 fOo?bAr@1.1:1.3
+    parseModuleSpecification 0 0 0 0 o?bAr@1.1:1.3
+    defineModVersCmpProc 0 0
+    report [modEqProc foo?bar@1.1:1.3 foo?bar/1.2 matchin]
+    report [modEqProc o?bar@1.1:1.3 foo?bar/1.4 matchin]
+    report [modEqProc o?bar@1.1:1.3 foo?bar/1.3 matchin]
+    defineModVersCmpProc 1 0
+    report [modEqProcIcase fOo?bAr@1.1:1.3 foo?bar/1.2 matchin]
+    report [modEqProcIcase o?bAr@1.1:1.3 foo?bar/1.4 matchin]
+    report [modEqProcIcase o?bAr@1.1:1.3 foo?bar/1.3 matchin]
+    defineModVersCmpProc 0 1
+    report [modEqProcExtdfl foo?bar@1.1:1.3 foo?bar/1.2.2 matchin]
+    report [modEqProcExtdfl o?bar@1.1:1.3 foo?bar/1.4.5 matchin]
+    report [modEqProcExtdfl o?bar@1.1:1.3 foo?bar/1.3.1 matchin]
+    defineModVersCmpProc 1 1
+    report [modEqProcIcaseExtdfl fOo?bAr@1.1:1.3 foo?bar/1.2.2 matchin]
+    report [modEqProcIcaseExtdfl o?bAr@1.1:1.3 foo?bar/1.4.5 matchin]
+    report [modEqProcIcaseExtdfl o?bAr@1.1:1.3 foo?bar/1.3.1 matchin]
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_REDEFONTHEFLYPROCS)]} {
+    defineModStartNbProc 0
+    defineModEqProc 0 0
+    report [modStartNb foo bar]
+    report [modStartNb foo foo]
+    report [modStartNb foo fOo]
+    defineModStartNbProc 0
+    defineModEqProc 0 0
+    report [modStartNb foo bar]
+    report [modStartNb foo foo]
+    report [modStartNb foo fOo]
+    defineModStartNbProc 1
+    defineModEqProc 1 1
+    report [modStartNb foo bar]
+    report [modStartNb foo foo]
+    report [modStartNb foo fOo]
+    defineModStartNbProc 1
+    defineModEqProc 1 1
+    report [modStartNb foo bar]
+    report [modStartNb foo foo]
+    report [modStartNb foo fOo]
+    defineModVersCmpProc 0 0
+    report [modVersCmp in {{eq foo}} foo eqstart]
+    report [modVersCmp in {{eq foo}} bar eqstart]
+    report [modVersCmp in {{eq foo}} fOo eqstart]
+    defineModVersCmpProc 0 0
+    report [modVersCmp in {{eq foo}} foo eqstart]
+    report [modVersCmp in {{eq foo}} bar eqstart]
+    report [modVersCmp in {{eq foo}} fOo eqstart]
+    defineModVersCmpProc 1 1
+    report [modVersCmp in {{eq foo}} foo eqstart]
+    report [modVersCmp in {{eq foo}} bar eqstart]
+    report [modVersCmp in {{eq foo}} fOo eqstart]
+    defineModVersCmpProc 1 1
+    report [modVersCmp in {{eq foo}} foo eqstart]
+    report [modVersCmp in {{eq foo}} bar eqstart]
+    report [modVersCmp in {{eq foo}} fOo eqstart]
+    defineModEqProc 0 0
+    report [modEq foo foo equal]
+    report [modEq foo bar equal]
+    report [modEq foo fOo equal]
+    defineModEqProc 0 0
+    report [modEq foo foo equal]
+    report [modEq foo bar equal]
+    report [modEq foo fOo equal]
+    defineModEqProc 1 1
+    report [modEq foo foo equal]
+    report [modEq foo bar equal]
+    report [modEq foo fOo equal]
+    defineModEqProc 1 1
+    report [modEq foo foo equal]
+    report [modEq foo bar equal]
+    report [modEq foo fOo equal]
+}
+
+# specific tests to improve formatErrStackTrace proc coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_FORMATERRSTACKTRACE)]} {
+    set errmsg {error message
+    while executing
+foo call
+    invoked from within
+foo
+    (file "foo")}
+
+    report [formatErrStackTrace $errmsg foo]
+}
+
+# produce an unknown error in a modulecmd.tcl procedure during a modulefile evaluation
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_UNKINTERRDURINGMODEVAL)]} {
+    proc getModshareVarName {var} {
+        foo
+    }
+}
+
+# set a bad value for tag_abbrev default value
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_BADTAGABBREVDFLVALUE)]} {
+    set g_config_defs(tag_abbrev) {MODULES_TAG_ABBREV {loaded} 0 l {} {} initConfTagAbbrev}
+}
+
+# set a bad value for variant_shortcut default value
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_BADVARIANTSHORTCUTDFLVALUE)]} {
+    set g_config_defs(variant_shortcut) {MODULES_VARIANT_SHORTCUT {foo} 0 l {} {} initConfVariantShortcut}
+}
+
+# specific tests to improve getModuleDesignation procs coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETMODULEDESIGNATION)]} {
+    # test disabled sgr mode
+    cacheCurrentModules
+    report [getModuleDesignation loaded variant/1.0 0]
+}
+
+# unsetModuleTag/unsetModuleExtraTag coverage test
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_UNSETMODULETAG)]} {
+    unsetModuleTag unk foo
+    unsetModuleExtraTag unk foo
+}
+
+# readCollectionContent coverage test
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_READCOLLCONTENT)]} {
+    readCollectionContent /path/to/unk unk
+}
+
+# test removal of alias, function and completion from a source-sh bash script
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_SOURCESHBASHUNSET)]} {
+    # update the list of commands run by execShAndGetEnv procedure
+    # to predefine alias, function and completion prior source-sh evaluation
+    proc traceCommandVarOfSourceSh {name1 name2 op} {
+        set defalias {alias alfoo='echo foo'}
+        set deffunc {funcfoo() { echo foo; }}
+        set defcomp {complete -o default -F _cmd cmd}
+        uplevel 1 [list set $name1 "$defalias; $deffunc; $defcomp; [uplevel 1 set $name1]"]
+    }
+    # update start of execShAndGetEnv proc to set up trace on command variable
+    set tracevarcall "trace add variable command write traceCommandVarOfSourceSh"
+    proc execShAndGetEnv [info args execShAndGetEnv] "$tracevarcall ; [info body execShAndGetEnv]"
+}
+
+# test removal of alias, function and completion from a source-sh tcsh script
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_SOURCESHTCSHUNSET)]} {
+    # update the list of commands run by execShAndGetEnv procedure
+    # to predefine alias, function and completion prior source-sh evaluation
+    proc traceCommandVarOfSourceSh {name1 name2 op} {
+        # no function definition: not supported on tcsh shell
+        set defalias {alias alfoo 'echo foo'}
+        set defcomp {complete cmd 'n/--help/n/'}
+        uplevel 1 [list set $name1 "$defalias; $defcomp; [uplevel 1 set $name1]"]
+    }
+    # update start of execShAndGetEnv proc to set up trace on command variable
+    set tracevarcall "trace add variable command write traceCommandVarOfSourceSh"
+    proc execShAndGetEnv [info args execShAndGetEnv] "$tracevarcall ; [info body execShAndGetEnv]"
+}
+
+# test removal of alias, function and completion from a source-sh fish script
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_SOURCESHFISHUNSET)]} {
+    # update the list of commands run by execShAndGetEnv procedure
+    # to predefine alias, function and completion prior source-sh evaluation
+    proc traceCommandVarOfSourceSh {name1 name2 op} {
+        set defalias {alias alfoo='echo foo'}
+        set deffunc {function funcfoo; echo foo; end}
+        set defcomp {complete -c cmd -s V -l version --description 'Command version'}
+        uplevel 1 [list set $name1 "$defalias; $deffunc; $defcomp; [uplevel 1 set $name1]"]
+    }
+    # update start of execShAndGetEnv proc to set up trace on command variable
+    set tracevarcall "trace add variable command write traceCommandVarOfSourceSh"
+    proc execShAndGetEnv [info args execShAndGetEnv] "$tracevarcall ; [info body execShAndGetEnv]"
+}
+
+# supersede pwd procedure to raise an error
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_PWDERROR)]} {
+    proc pwd {} {
+        error {Custom error message}
+    }
+}
+
+# extra modulefile/modulerc command and variable tests
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_ODD)]} {
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_ODD) {
+        cmd    {set modulefile_extra_cmds [list mycmd]}
+        rc_cmd {set modulerc_extra_cmds [list mycmd]}
+        var    {set modulefile_extra_vars [list myvar]}
+        rc_var {set modulerc_extra_vars [list myvar]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_EMPTYDEF)]} {
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_EMPTYDEF) {
+        cmd    {set modulefile_extra_cmds [list]}
+        rc_cmd {set modulerc_extra_cmds {}}
+        var    {set modulefile_extra_vars {}}
+        rc_var {set modulerc_extra_vars [list]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_EMPTYVAL)]} {
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_EMPTYVAL) {
+        cmd    {set modulefile_extra_cmds [list mycmd {}]}
+        rc_cmd {set modulerc_extra_cmds [list mycmd {}]}
+        var    {set modulefile_extra_vars [list myvar {}]}
+        rc_var {set modulerc_extra_vars [list myvar {}]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_UNK)]} {
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_UNK) {
+        cmd    {set modulefile_extra_cmds [list mycmd unkproc]}
+        rc_cmd {set modulerc_extra_cmds [list mycmd unkproc]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_SUPERSEDE)]} {
+    proc myproc1 {args} {
+        return myproc1
+    }
+    proc myproc2 {args} {
+        return myproc2
+    }
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_SUPERSEDE) {
+        cmd    {set modulefile_extra_cmds [list uname myproc1 pid myproc2]}
+        rc_cmd {set modulerc_extra_cmds [list uname myproc1 pid myproc2]}
+        var    {set modulefile_extra_vars [list ModuleTool super ModulesCurrentModulefile myfile]}
+        rc_var {set modulerc_extra_vars [list ModuleTool super ModulesCurrentModulefile myfile]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_SPACEINVAL)]} {
+    proc {my proc1} {args} {
+        return myproc1
+    }
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_SPACEINVAL) {
+        cmd    {set modulefile_extra_cmds [list mycmd {my proc1}]}
+        rc_cmd {set modulerc_extra_cmds [list mycmd {my proc1}]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_SPACEINNAME)]} {
+    proc myproc1 {args} {
+        return myproc1
+    }
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_SPACEINNAME) {
+        cmd    {set modulefile_extra_cmds [list {my cmd} myproc1]}
+        rc_cmd {set modulerc_extra_cmds [list {my cmd} myproc1]}
+        var    {set modulefile_extra_vars [list {my var} value]}
+        rc_var {set modulerc_extra_vars [list {my var} value]}
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_REGULAR)]} {
+    proc mycmd {args} {
+        return myproc1
+    }
+    proc mycmd2 {args} {
+        return myproc2
+    }
+    switch -- $env(TESTSUITE_ENABLE_SITECONFIG_EXTRA_REGULAR) {
+        cmd    {set modulefile_extra_cmds [list mycmd mycmd othercmd mycmd2]}
+        rc_cmd {set modulerc_extra_cmds [list mycmd mycmd othercmd mycmd2]}
+        var    {set modulefile_extra_vars [list myvar {my value} othervar value]}
+        rc_var {set modulerc_extra_vars [list myvar {my value} othervar value]}
+        mix - override   {
+            set modulefile_extra_cmds [list mycmd mycmd othercmd mycmd2]
+            set modulerc_extra_cmds [list mycmd mycmd othercmd mycmd2]
+            set modulefile_extra_vars [list myvar value]
+            set modulerc_extra_vars [list myvar value]
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_CACHECLEAR_DELETE)]\
+    || [info exists env(TESTSUITE_ENABLE_SITECONFIG_CACHEBUILD_CREATE)]\
+    || [info exists env(TESTSUITE_ENABLE_SITECONFIG_CACHE_READ)]} {
+    rename file __file
+    proc file {args} {
+        switch -- [lindex $args 0] {
+            readable - writable {
+                return 1
+            }
+            default {
+                return [__file {*}$args]
+            }
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_CACHEBUILD_READ1)]} {
+    proc readFile {filename {firstline 0} {must_have_cookie 0}} {
+        if {[string first bar/1.0 $filename] > -1} {
+            set filename unk
+        }
+        return [__readFile $filename $firstline $must_have_cookie]
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_CACHEBUILD_READ2)]} {
+    proc readFile {filename {firstline 0} {must_have_cookie 0}} {
+        if {[string first foo/.modulerc $filename] > -1} {
+            set filename unk
+        }
+        return [__readFile $filename $firstline $must_have_cookie]
+    }
+}
+
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_MKDIR_COLLDIR)]} {
+    rename file __file
+    proc file {args} {
+        switch -- [lindex $args 0] {
+            mkdir {
+                error {Custom error message}
+            }
+            default {
+                return [__file {*}$args]
+            }
+        }
+    }
+}
+
+# specific test to improve getInterpVar proc coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETINTERPVAR)]} {
+    interp create foo
+    report [getInterpVar foo bar undef]
+    foo eval {set bar value}
+    report [getInterpVar foo bar undef]
+    interp delete foo
+}
+
+# specific test to improve getLoadingModulefileList proc coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETLOADINGMODULEFILELIST)]} {
+    lappendState modulefile /path/to/foo/1.0
+    lappendState mode load
+    lappendState modulefile /path/to/bar/1.0
+    lappendState mode unload
+    lappendState modulefile /path/to/qux/1.0
+    lappendState mode load
+    report [getLoadingModuleFileList]
+}
+
+# specific test to improve getModuleFromLoadingModulefile proc coverage
+if {[info exists env(TESTSUITE_ENABLE_SITECONFIG_GETMODULEFROMLOADINGMODULEFILE)]} {
+    lappendState modulefile /path/to/foo/1.0
+    lappendState modulename qux/1.0
+    lappendState mode load
+    lappendState modulefile /path/to/bar/1.0
+    lappendState modulename bar/1.0
+    lappendState mode load
+    lappendState modulefile /path/to/foo/1.0
+    lappendState modulename foo/1.0
+    lappendState mode load
+    report [getModuleFromLoadingModulefile /path/to/foo/1.0 0]
+}
+
+}

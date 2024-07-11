@@ -1,0 +1,54 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	1995/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		load
+#   Modulefiles:	alias/2.0
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests the 'set-alias' module subcommand for all allowed
+#			shell types.
+#		}C%
+#
+##############################################################################
+
+#
+#  Variables. This test forces a module load command. It will result in the
+#    environment variables "_LMFILES_", "LOADEDMODULES" and "testsuite" to
+#    be set up
+#
+
+set module "alias/2.0"
+set modulefile "$modpath/$module"
+set alias "ps -auxww | grep modulecmd"
+
+#
+#  For the different shells ...
+#
+
+lappend ans [list set __MODULES_LMREFRESH $module]
+lappend ans [list set _LMFILES_ $modulefile]
+lappend ans [list set LOADEDMODULES $module]
+lappend ans [list alias testsuite $alias]
+
+#
+#  The tests
+#
+
+# only available for csh/sh/fish derivatives ... no longer warn for others
+test_cmd "ALL" "load $module" $ans
+
+#
+#  Cleanup
+#
+
+reset_test_env
