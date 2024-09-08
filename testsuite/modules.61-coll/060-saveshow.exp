@@ -1,0 +1,277 @@
+##############################################################################
+#   Modules Release Tcl
+#   Providing a flexible user environment
+#
+#   File:		modules.61-coll/%M%
+#   Revision:		%I%
+#   First Edition:	2016/08/16
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:
+#   Modulefiles:
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Test the module 'saveshow' command
+#		}C%
+#
+##############################################################################
+
+set cbadnerrmsg [err_coll_notfound $collbadn]
+set cbadfperrmsg [err_coll_notfound $collbadfp]
+set cbadterrmsg [err_coll_notfound $colld $colltarget]
+set badcontfp "$homewithcoll/.Xresources"
+set badcontfperrmsg [err_coll_notvalid $badcontfp]
+
+
+# set HOME to location containing collections
+if { $verbose > 0 } {
+    send_user "\tSetup HOME = $homewithcoll\n"
+}
+set env(HOME) "$homewithcoll"
+
+
+#
+# test showing nonexistent collection
+#
+
+testouterr_cmd "ALL" "saveshow $collbadn" "ERR" "$cbadnerrmsg"
+
+
+#
+# test showing nonexistent collection specified as a filepath
+#
+
+testouterr_cmd "ALL" "saveshow $collbadfp" "ERR" "$cbadfperrmsg"
+
+
+#
+# test showing existent file which is not a collection
+#
+
+testouterr_cmd "ALL" "saveshow $badcontfp" "ERR" "$badcontfperrmsg"
+
+
+#
+# test showing collection requiring an upcoming version of Modules
+# test effect of mcookie configuration with this collection
+#
+
+testouterr_cmd sh "saveshow $coll48" ERR [collerr_minverreqns $coll48fp 99]
+testouterr_cmd sh "saveshow $coll48fp" ERR [collerr_minverreqns $coll48fp 99]
+
+setenv_var MODULES_MCOOKIE_CHECK eval
+testouterr_cmd sh "saveshow $coll48" ERR [collerr_minverreqns $coll48fp 99]
+setenv_var MODULES_MCOOKIE_CHECK always
+
+setenv_var MODULES_MCOOKIE_VERSION_CHECK 0
+testouterr_cmd sh "saveshow $coll48" ERR [collerr_minverreqns $coll48fp 99]
+setenv_var MODULES_MCOOKIE_VERSION_CHECK 1
+
+
+#
+# test showing default collection
+#
+
+# test only sh shell as this test does not produce shell output
+testouterr_cmd_re "sh" "saveshow" "OK" "$modlin\n$homewithcolldotmodre/$colld:\n\n$cdcontrepin\n$modlin"
+
+skip_if_quick_mode
+
+#
+# test showing named collection
+# using old fashioned way to define paths (no --append property)
+#
+
+# test only sh shell as this test does not produce shell output
+testouterr_cmd_re "sh" "saveshow $coll1" "OK" "$modlin\n$homewithcolldotmodre/$coll1:\n\n$presavedc1cont1re\n$modlin"
+
+
+#
+# test showing collection specified as a filepath when
+# MODULES_COLLECTION_TARGET is set. target should be ignored
+#
+
+# setup environment state
+if { $verbose > 0 } {
+    send_user "\tSetup MODULES_COLLECTION_TARGET = $colltarget\n"
+}
+set env(MODULES_COLLECTION_TARGET) "$colltarget"
+
+# test only sh shell as this test does not produce shell output
+testouterr_cmd_re "sh" "saveshow $homewithcolldotmod/$coll1" "OK" "$modlin\n$homewithcolldotmodre/$coll1:\n\n$presavedc1cont1re\n$modlin"
+
+
+#
+# test showing collection not mentioning module to load
+# when MODULES_COLLECTION_TARGET is set
+#
+
+# test only sh shell as this test does not produce shell output
+testouterr_cmd_re "sh" "saveshow $coll4" "OK" "$modlin\n$homewithcolldotmodre/$coll4f:\n\n$c4contre\n$modlin"
+
+
+#
+# test displaying same collection than before but with a modulepath
+# prepended rather appended
+#
+
+testouterr_cmd_re "sh" "saveshow $coll5fp" "OK" "$modlin\n$coll5fpre:\n\n$c4contre\n$modlin"
+
+
+#
+# test displaying collection with no modulepath and modulefiles loaded as fullpath
+#
+
+testouterr_cmd_re "sh" "saveshow $coll7fp" "OK" "$modlin\n$coll7fpre:\n\n$c7contre\n$modlin"
+
+
+#
+# test showing nonexistent default collection when
+# MODULES_COLLECTION_TARGET is set
+#
+
+testouterr_cmd "ALL" "saveshow default" "ERR" "$cbadterrmsg"
+
+# no collection name specified, if default collection does not exists
+# initial environment is displayed
+set tserr "$modlin\ninitial environment:\n\n\n$modlin"
+testouterr_cmd_re ALL saveshow OK $tserr
+
+# same effect if __init__ name is provided
+testouterr_cmd_re sh {saveshow __init__} OK $tserr
+
+# set specific initial environment
+setenv_var __MODULES_LMINIT "module use --append $c9modpath1:module load $c9mod3"
+set tserr "$modlin
+initial environment:
+
+module use --append [escre $c9modpath1]
+module load $c9mod3
+
+$modlin"
+testouterr_cmd_re sh saveshow OK $tserr
+testouterr_cmd_re sh {saveshow __init__} OK $tserr
+
+unsetenv_var __MODULES_LMINIT
+
+
+#
+# test displaying collection with no modulepath and modulefiles loaded as fullpath
+#
+
+unsetenv_var MODULES_COLLECTION_TARGET
+
+if {!$is_symlink_supported} {
+    send_user "\tskipping tests over '$modpath wspace' modulepath as symbolic links are not supported on filesystem\n"
+} else {
+
+testouterr_cmd_re sh "saveshow $coll15fp" OK "$modlin\n$coll15fpre:\n\n$c15contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll16fp" OK "$modlin\n$coll16fpre:\n\n$c16contre\n$modlin"
+
+}
+
+#
+# test displaying collection with modulepath starting with variable reference
+#
+
+testouterr_cmd_re sh "saveshow $coll17fp" OK "$modlin\n$coll17fpre:\n\n$c17contre\n$modlin"
+
+#
+# variant tests
+#
+
+# ensure advanced_version_spec is enabled to record variant
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+
+# test with collection_pin_version enabled
+setenv_var MODULES_COLLECTION_PIN_VERSION 1
+
+testouterr_cmd_re sh "saveshow $coll19fp" OK "$modlin\n$coll19fpre:\n\n$c19contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll25fp" OK "$modlin\n$coll25fpre:\n\n$c25contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll26fp" OK "$modlin\n$coll26fpre:\n\n$c26contre\n$modlin"
+
+# test with collection_pin_version enabled
+setenv_var MODULES_COLLECTION_PIN_VERSION 0
+
+testouterr_cmd_re sh "saveshow $coll19fp" OK "$modlin\n$coll19fpre:\n\n$c19contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll25fp" OK "$modlin\n$coll25fpre:\n\n$c25contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll26fp" OK "$modlin\n$coll26fpre:\n\n$c26contre\n$modlin"
+
+# disable advanced_version_spec
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+
+# each variant set is considered a module to load
+testouterr_cmd_re sh "saveshow $coll19fp" OK "$modlin\n$coll19fpre:\n\n$c19contnoavsre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll26fp" OK "$modlin\n$coll26fpre:\n\n$c26contnoavsre\n$modlin"
+
+# test showing collection with bad module specification
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+testouterr_cmd_re sh "saveshow $coll27fp" ERR "$error_msgs: $msg_nomodnameinarg 'foo=val'"
+testouterr_cmd_re sh "saveshow $coll28fp" ERR "$error_msgs: $msg_nomodnameinarg '@1.0'"
+testouterr_cmd_re sh "saveshow $coll29fp" OK "$modlin\n$coll29fpre:\n\n$c29contre\n$modlin"
+
+# test showing collection with variant shortcut set
+setenv_var MODULES_VARIANT_SHORTCUT foo=%
+testouterr_cmd_re sh "saveshow $coll36fp" OK "$modlin\n$coll36fpre:\n\n$c36contre\n$modlin"
+unsetenv_var MODULES_VARIANT_SHORTCUT
+
+unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+unsetenv_var MODULES_COLLECTION_PIN_VERSION
+
+
+#
+# tag tests
+#
+
+# ensure advanced_version_spec is enabled to record variant
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+
+setenv_var TESTSUITE_TAG_OPT colltag1
+testouterr_cmd_re sh "saveshow $coll37fp" OK "$modlin\n$coll37fpre:\n\n$c37contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll38fp" OK "$modlin\n$coll38fpre:\n\n$c38contre\n$modlin"
+
+unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+
+setenv_var TESTSUITE_TAG_OPT colltag2
+testouterr_cmd_re sh "saveshow $coll39fp" OK "$modlin\n$coll39fpre:\n\n$c39contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll40fp" OK "$modlin\n$coll40fpre:\n\n$c40contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll41fp" OK "$modlin\n$coll41fpre:\n\n$c41contre\n$modlin"
+testouterr_cmd_re sh "saveshow $coll42fp" OK "$modlin\n$coll42fpre:\n\n$c42contre\n$modlin"
+
+setenv_var MODULES_ADVANCED_VERSION_SPEC 1
+set tserr "$error_msgs: $msg_nomodnameinarg '--tag'"
+testouterr_cmd_re sh "saveshow $coll43fp" ERR $tserr
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+testouterr_cmd_re sh "saveshow $coll43fp" OK "$modlin\n$coll43fpre:\n\n$c43contre\n$modlin"
+unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+
+unsetenv_var TESTSUITE_TAG_OPT
+
+
+#
+# test unsetting HOME
+#
+
+if { $verbose > 0 } {
+    send_user "\tUnset HOME \n"
+}
+unset env(HOME)
+
+testouterr_cmd "sh" "saveshow" "ERR" $nohomeerrmsg
+
+# restore default testsuite home
+if { $verbose > 0 } {
+    send_user "\tRestore HOME = $ORIG_HOME\n"
+}
+set env(HOME) $ORIG_HOME
+
+
+#
+# Cleanup
+#
+
+reset_test_env

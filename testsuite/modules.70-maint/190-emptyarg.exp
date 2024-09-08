@@ -1,0 +1,114 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.70-maint/%M%
+#   Revision:		%I%
+#   First Edition:	2018/03/18
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:        load, unload, display, help, test, path, switch,
+#                   source, whatis, apropos, paths, purge, reload,
+#                   aliases, savelist, autoinit, save, restore, saveshow,
+#                   saverm, is-saved, use, unuse, is-loaded, is-used,
+#                   is-avail, info-loaded, append-path, prepend-path,
+#                   remove-path
+#   Modulefiles:
+#   Sub-Command:
+#
+#   Comment:	%C{
+#           Test commands with an empty string argument passed on command-line
+#		}C%
+#
+##############################################################################
+
+skip_if_quick_mode
+
+set module1 "/path/to/mod1"
+set modulefile1 "$module1"
+set module2 "loc_dv1/1.0"
+set modulefile2 "$modpath/$module2"
+
+# setup specific environment (with current path as modulepath and a module
+# loaded with full path name) to check passed empty argument is not mismatched
+# with something else due to these conditions
+setenv_path_var MODULEPATH $modpath [pwd]
+setenv_loaded_module $module1 $modulefile1
+
+
+# wrong arg number if command does not accept any argument
+foreach cmd [list purge reload aliases autoinit] {
+    testouterr_cmd "sh" "$cmd " "ERR" "$error_msgs: Unexpected number of args for '$cmd' command\n$err_typehelp"
+}
+
+
+# on most commands, empty arg leads to error
+foreach cmd [list "load" "unload" "display" "help" "test"] {
+    testouterr_cmd "sh" "$cmd " "ERR" $err_emptymodname
+}
+foreach cmd [list "save" "restore" "saveshow" "saverm" "is-saved"] {
+    testouterr_cmd "sh" "$cmd " "ERR" $err_emptycollname
+}
+foreach cmd [list "use" "unuse"] {
+    testouterr_cmd "sh" "$cmd " "ERR" $err_emptydirname
+}
+testouterr_cmd "sh" "source " "ERR" $err_emptyfilename
+testouterr_cmd "sh" "swap  $module2" "ERR" [msg_switch {} $module2 $err_emptymodname]
+
+# switch: an empty second arg leads to one name rule
+set ans [list]
+lappend ans [list set _LMFILES_ "$modulefile1:$modulefile2"]
+lappend ans [list set LOADEDMODULES "$module1:$module2"]
+testouterr_cmd_re "sh" "swap $module2 " $ans ""
+
+# path: empty result returned
+set ans [list]
+lappend ans [list text ""]
+testouterr_cmd "sh" "path " $ans $err_emptymodname
+
+
+# return false or empty, no error reported
+foreach cmd [list is-loaded is-used is-avail] {
+    testouterr_cmd "sh" "$cmd " "ERR" ""
+}
+testouterr_cmd "sh" "info-loaded " $ans ""
+
+
+# also leads to error for path management commands except if only variable value is empty
+set ans [list]
+lappend ans [list setpath FOO ""]
+testouterr_cmd "sh" "append-path  " "ERR" "$error_msgs: append-path $msg_validenvvarname"
+testouterr_cmd "sh" "append-path -d   " "ERR" "$error_msgs: append-path $msg_nonemptydelim"
+testouterr_cmd "sh" "append-path FOO " $ans ""
+testouterr_cmd "sh" "prepend-path  " "ERR" "$error_msgs: prepend-path $msg_validenvvarname"
+testouterr_cmd "sh" "prepend-path -d   " "ERR" "$error_msgs: prepend-path $msg_nonemptydelim"
+testouterr_cmd "sh" "prepend-path FOO " $ans ""
+testouterr_cmd "sh" "remove-path  " "ERR" "$error_msgs: remove-path $msg_validenvvarname"
+testouterr_cmd "sh" "remove-path -d   " "ERR" "$error_msgs: remove-path $msg_nonemptydelim"
+set ans [list]
+lappend ans [list unset FOO ""]
+testouterr_cmd "sh" "remove-path FOO " $ans ""
+
+# restore MODULEPATH
+setenv_path_var MODULEPATH $modpath
+
+# empty string currently understood like wildcard
+foreach cmd [list whatis apropos] {
+    # error rendered as some evaluated modules produce error
+    testouterr_cmd_re "sh" "$cmd " "ERR" ".+"
+}
+testouterr_cmd_re "sh" "avail " "" ".+"
+testouterr_cmd_re sh {list } OK .+
+testouterr_cmd_re sh {savelist } OK [msg_no_named_coll]
+# except for non-wild search like paths sub-command
+testouterr_cmd_re "sh" "paths " "" ".+"
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

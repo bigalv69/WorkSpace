@@ -1,0 +1,186 @@
+#!/usr/bin/env tclsh
+#
+# MLPROF, profile a given modulecmd execution
+# Copyright (C) 2019-2022 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+proc reportUsage {} {
+   puts "Usage: $::argv0 \[option\] mode versiontag args...
+
+Profile a given modulecmd execution
+
+Modes:
+  reportX         Report profiling of top X called procedures
+  print           Print full profiling report
+
+Define modulecmd.tcl run:
+  versiontag      Select modulecmd.tcl version to profile
+  args            Set modulecmd.tcl arguments to define execution to profile
+
+Options:
+  -h, --help      Show this help message and exit
+
+Examples:
+  $::argv0 report10 v5.0.1 avail
+  $::argv0 report5 v4.5.3 load mymod/3.0
+  $::argv0 print v5.1.1 list"
+}
+
+proc sgr {sgrcode str} {
+   return "\033\[${sgrcode}m$str\033\[0m"
+}
+
+proc reportError {str} {
+   puts "[sgr {1;31} ERROR]: $str"
+}
+
+# parse arguments
+set hintmsg "\n  Try '$argv0 --help' for more information."
+# treat options
+set firstarg [lindex $argv 0]
+switch -glob -- $firstarg {
+   -h - --help {
+      reportUsage
+      exit 0
+   }
+   -* {
+      reportError "Invalid option '$firstarg'$hintmsg"
+      exit 1
+   }
+}
+if {$argc < 2} {
+   reportError "Unexpected number of arguments$hintmsg"
+   exit 1
+}
+# how to report collected data
+set mode $firstarg
+# get modulecmd version to run
+set tag [lindex $argv 1]
+
+# fix arguments to run modulecmd.tcl via source command
+set argv [lrange [lreplace $argv 1 1 sh] 1 end]
+
+# clean argument management code prior profiling
+rename reportUsage {}
+rename sgr {}
+rename reportError {}
+unset hintmsg
+
+# inhibit exit command to get through the whole modulecmd.tcl script and
+# and finish here to compute profiling result
+rename ::exit ::__exit
+proc exit {{returnCode 0}} {}
+# also inhibit puts to ensure nothing is printed during execution
+rename ::puts ::__puts
+##nagelfar syntax puts r 0
+proc puts {args} {}
+
+# initialize profiling
+package require profiler
+
+# Rewrite profProc procedure of profiler Tcllib module as original procedure
+# reset procedure it profiles each time it is defined, which does not suit
+# our needs as modulecmd.tcl as several procedures that are rewritten along
+# the process. So here pre-existing statistic counters are not reset during
+# proc profiling initialization.
+rename ::profiler::profProc ::profiler::__profProc
+proc ::profiler::profProc {name arglist body} {
+   # save pre-existing counters for proc name
+   variable callCount
+   variable compileTime
+   variable totalRuntime
+   variable descendantTime
+   variable statTime
+   variable enabled
+   variable paused
+
+   # Get the fully qualified name of the proc
+   set ns [uplevel [list namespace current]]
+   # If the proc call did not happen at the global context and it did not
+   # have an absolute namespace qualifier, we have to prepend the current
+   # namespace to the command name
+   if { ![string equal $ns "::"] } {
+      if { ![string match "::*" $name] } {
+         set name "${ns}::${name}"
+      }
+   }
+   if { ![string match "::*" $name] } {
+      set name "::$name"
+   }
+
+   # Set up accounting for this procedure
+   # Change for mlprof: keep existing stats if any
+   if {![info exists callCount($name)]} {
+      set callCount($name) 0
+      set compileTime($name) 0
+      set totalRuntime($name) 0
+      set descendantTime($name) 0
+      set statTime($name) {}
+   }
+   set enabled($name) [expr {!$paused}]
+
+   if {[package vsatisfies [package provide Tcl] 8.4]} {
+       uplevel 1 [list ::_oldProc $name $arglist $body]
+       ##nagelfar subcmd+ {trace add execution} {enter leave}
+       trace add execution $name {enter leave} \
+          [list ::profiler::TraceHandler $name]
+   } else {
+       uplevel 1 [list ::_oldProc ${name}ORIG $arglist $body]
+       uplevel 1 [list interp alias {} $name {} ::profiler::Handler $name]
+   }
+   return
+}
+
+profiler::init
+
+# run modulecmd with profiling enabled
+source modulecmd.$tag
+
+# restore puts command to output profiling result
+rename ::puts {}
+rename ::__puts ::puts
+
+if {[string equal -length 6 $mode report]} {
+   # number of proc timing to return
+   set nbproc [string range $mode 6 end]
+   if {![string is integer $nbproc]} {
+      set nbproc 10
+   }
+   # post-process profiling data
+   set totalruntime 0
+   set totalcall 0
+   foreach {procname profdata} [::profiler::dump] {
+      array unset procprof
+      array set procprof $profdata
+      set procname [string trimleft $procname :]
+      # compute proc inner runtime (subtracting descendent proc runtime)
+      set runtime [expr {$procprof(totalRuntime) - $procprof(descendantTime)}]
+      incr totalruntime $runtime
+      incr totalcall $procprof(callCount)
+      lappend profres [list $procname $procprof(callCount) $runtime]
+   }
+   # record total runtime
+   lappend profres [list Total $totalcall $totalruntime]
+
+   # output total time and timing of the 10 biggest procs
+   puts [eval concat [lrange [lsort -integer -decreasing -index 2 $profres] 0\
+      [expr {$nbproc + 1}]]]
+} else {
+   puts [profiler::print]
+}
+
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent syntax=tcl:

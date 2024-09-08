@@ -1,0 +1,330 @@
+#!/usr/bin/env tclsh
+#
+# MB, make bench between modulecmd versions
+# Copyright (C) 2019-2022 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+proc reportUsage {} {
+   puts "Usage: $::argv0 \[options\] \[bench|profile\] \[test...\]
+
+Make bench between modulecmd versions
+
+Available tests:
+  help, avail, avail_cache, avail2, avail2_cache, avail3, avail3_cache,
+  whatis, whatis_cache, whatis2, whatis2_cache, whatis3, whatis3_cache,
+  apropos, load, load_cache, list, unload (all tests selected by default)
+
+Modes:
+  bench           Report command execution time
+  profile         Report top 10 procedure calls
+
+Options:
+  -h, --help      Show this help message and exit
+
+Examples:
+   $::argv0
+   $::argv0 profile
+   $::argv0 load unload list"
+}
+
+proc sgr {sgrcode str} {
+   return "\033\[${sgrcode}m$str\033\[0m"
+}
+
+proc reportError {str} {
+   puts "[sgr {1;31} ERROR]: $str"
+}
+
+set benchrep 20
+set profprocnb 10
+set curdir [pwd]
+
+# time test run for a given modulecmd version
+proc bench {tag args} {
+   return [expr {round([lindex [split [time {eval exec ./modulecmd.$tag sh\
+      $args >>& /dev/null} $::benchrep]] 0] / 1000)}]
+}
+
+# profile given modulecmd version test run
+proc profile {tag args} {
+   return [eval exec script/mlprof report$::profprocnb $tag $args]
+}
+
+# procedures to create cache file in modulepaths prior tests and remove them
+# after tests
+proc module_cache_create {tag} {
+   exec ./modulecmd.$tag sh --silent cachebuild
+}
+proc module_cache_delete {tag} {
+   exec ./modulecmd.$tag sh --silent cacheclear
+}
+
+# run test for each modulecmd version
+proc runtest {mode test} {
+   # is test a cache-enabled version of another test
+   if {[set idx [string first _cache $test]] > -1} {
+      set eff_test [string range $test 0 $idx-1]
+      set use_cache 1
+   } else {
+      set eff_test $test
+      set use_cache 0
+   }
+
+   # set environment for test (based on effective test config)
+   if {[info exists ::testenvlist($eff_test)]} {
+      foreach {var val} $::testenvlist($eff_test) {
+         set ::env($var) $val
+      }
+   }
+
+   if {[info exists ::testsubcmdlist($eff_test)]} {
+      lappend cmdlist $::testsubcmdlist($eff_test)
+   } else {
+      lappend cmdlist $eff_test
+   }
+
+   if {[info exists ::testarglist($eff_test)]} {
+      set cmdlist [concat $cmdlist $::testarglist($eff_test)]
+   }
+
+   foreach tag $::taglist {
+      # run test if tag version is compatible with it
+      if {[info exists ::testcompatlist($test)] && [string match {v[0-9]*}\
+         $tag] && "v$::testcompatlist($test)" ne $tag && [lindex [lsort\
+         -dictionary [list v$::testcompatlist($test) $tag]] 0] eq $tag} {
+         if {$mode eq {bench}} {
+            set res -
+         } else {
+            set res [list - 0 0]
+            for {set i 0} {$i < $::profprocnb} {incr i 1} {
+               lappend res - 0 0
+            }
+         }
+      } else {
+         if {$use_cache} {
+            module_cache_create $tag
+         }
+         set res [eval $mode $tag $cmdlist]
+         if {$use_cache} {
+            module_cache_delete $tag
+         }
+      }
+      lappend ::testres($test) $tag $res
+   }
+
+   # clean test environment
+   if {[info exists ::testenvlist($eff_test)]} {
+      foreach {var val} $::testenvlist($eff_test) {
+         unset ::env($var)
+      }
+   }
+}
+
+# parse arguments
+set hintmsg "\n  Try '$argv0 --help' for more information."
+foreach arg $argv {
+   switch -glob -- $arg {
+      profile {
+         set mode profile
+      }
+      bench {
+         set mode bench
+      }
+      help - avail - avail_cache - avail2 - avail2_cache - avail3 -\
+         avail3_cache - whatis - whatis_cache - whatis2 - whatis2_cache -\
+         whatis3 - whatis3_cache - apropos - load - load_cache - list -\
+         unload {
+         lappend testlist $arg
+      }
+      -h - --help {
+         reportUsage
+         exit 0
+      }
+      -* {
+         reportError "Invalid option '$arg'$hintmsg"
+         exit 1
+      }
+      default {
+         reportError "Invalid test name '$arg'$hintmsg"
+         exit 1
+      }
+   }
+}
+# use default values if not set on command-line
+if {![info exists mode]} {
+   set mode bench
+}
+if {![info exists testlist]} {
+   set testlist [list help avail avail_cache avail2 avail2_cache avail3\
+      avail3_cache whatis whatis_cache whatis2 whatis2_cache whatis3\
+      whatis3_cache apropos load load_cache list unload]
+}
+
+# fetch information from git repository to save workspace and get available
+# modulecmd releases to compare. script will exit on first git command if it
+# not called from a git repository
+set headcommit [exec git rev-parse --short=8 HEAD]
+array set headref_list [exec git show-ref --heads --abbrev=8]
+set headref [expr {[info exists headref_list($headcommit)] ?\
+   [string range $headref_list($headcommit) 11 end] : $headcommit}]
+
+set needstash [expr {[exec git status --porcelain --untracked-files=no] ne\
+   {}}]
+
+# only keep last bugfix version of significant minor release
+# drop releases older than 4.1 (or older than 4.5 if profile mode)
+# drop several releases (to keep some old version in comparison)
+# also drop alpha/beta releases
+set exclvers_list [list v4.2 v4.4 v4.6 v4.8 v5.0 v5.2]
+set exclbef [expr {$mode eq {profile} ? {4.5} : {4.1}}]
+array set tagarray [list]
+foreach tag [exec git tag --list v*] {
+   if {[string compare $tag v$exclbef] == 1 && [string first alpha $tag] ==\
+      -1 && [string first beta $tag] == -1} {
+      set majmin [join [lrange [split $tag .] 0 1] .]
+      if {[lsearch -exact $exclvers_list $majmin] == -1 && (![info exists\
+         tagarray($majmin)] || [string compare $tag $tagarray($majmin)] ==\
+         1)} {
+         set tagarray($majmin) $tag
+      }
+   }
+}
+
+foreach tag [lsort [array names tagarray]] {
+   lappend taglist $tagarray($tag)
+}
+lappend taglist $headref
+
+# save workspace
+if {$needstash} {
+   exec git stash
+}
+
+# check what tag need to be built
+foreach tag $taglist {
+   if {![file exists modulecmd.$tag]} {
+      lappend tagtobuildlist $tag
+   }
+}
+
+# build modulecmd and associated libtclenvmodules for each tag
+if {[info exists tagtobuildlist]} {
+   # clean current workspace to build clean configuration
+   catch {file delete modulecmd-test.tcl modulecmd.tcl\
+      lib/libtclenvmodules.so}
+
+   foreach tag $tagtobuildlist {
+      exec git checkout $tag 2>@1
+      set buildtarget [expr {[string index $tag 0] ne {v} || [string\
+         compare $tag v4.3] == 1 ? {modulecmd-test.tcl} : {modulecmd.tcl}}]
+      exec make SHLIB_SUFFIX=.so.$tag $buildtarget
+      file rename $buildtarget modulecmd.$tag
+      file attributes modulecmd.$tag -permissions ugo+x
+      if {[file exists lib/envmodules.c]} {
+         exec make lib/libtclenvmodules.so
+         file rename lib/libtclenvmodules.so lib/libtclenvmodules.so.$tag
+      }
+   }
+}
+
+
+# configure environment for tests
+catch {unset env(LOADEDMODULES)}
+catch {unset env(LOADEDMODULES_modshare)}
+catch {unset env(_LMFILES_)}
+catch {unset env(_LMFILES__modshare)}
+catch {unset env(MODULEPATH_modshare)}
+catch {unset env(__MODULES_SHARE_MODULEPATH)}
+
+# define bench tests and their arguments and environment
+set modpath $curdir/testsuite/modulefiles
+array set testsubcmdlist [list avail2 avail avail3 avail whatis2 whatis\
+   whatis3 whatis]
+array set testarglist [list avail2 load whatis2 load load load/all unload\
+   load/all]
+##nagelfar ignore Too long line
+array set testenvlist [list avail [list MODULEPATH $modpath.deep:$modpath.deps] load [list MODULEPATH $modpath] list [list MODULEPATH $modpath LOADEDMODULES load/10:load/11:load/12:load/13:load/14:load/15:load/16:load/17:load/18:load/19:load/20:load/21:load/22:load/23:load/24:load/25:load/26:load/27:load/28:load/29:load/30:load/all _LMFILES_ $modpath/load/10:$modpath/load/11:$modpath/load/12:$modpath/load/13:$modpath/load/14:$modpath/load/15:$modpath/load/16:$modpath/load/17:$modpath/load/18:$modpath/load/19:$modpath/load/20:$modpath/load/21:$modpath/load/22:$modpath/load/23:$modpath/load/24:$modpath/load/25:$modpath/load/26:$modpath/load/27:$modpath/load/28:$modpath/load/29:$modpath/load/30:$modpath/load/all __MODULES_LMALTNAME load/all&load/default&load]]
+set testenvlist(avail2) $testenvlist(avail)
+set testenvlist(avail3) [list MODULEPATH $modpath.2 MODULERCFILE\
+   $curdir/testsuite/etc/modulerc.bench3 MODULES_ADVANCED_VERSION_SPEC 1\
+   MODULES_EXTENDED_DEFAULT 1]
+set testenvlist(whatis) $testenvlist(avail)
+set testenvlist(whatis2) $testenvlist(avail)
+set testenvlist(whatis3) $testenvlist(avail3)
+set testenvlist(apropos) $testenvlist(avail)
+set testenvlist(unload) $testenvlist(list)
+# some tests have a minimum version requirement
+array set testcompatlist [list avail3 4.6.0 whatis3 4.6.0 avail_cache 5.3.0\
+   avail2_cache 5.3.0 avail3_cache 5.3.0 whatis_cache 5.3.0 whatis2_cache\
+   5.3.0 whatis3_cache 5.3.0 load_cache 5.3.0]
+
+# adapt output table to test mode
+if {$mode eq {profile}} {
+   set collen 45
+   set colsep {----------------------------------------------+}
+} else {
+   set collen 9
+   set colsep {----------+}
+}
+set linesep --------------+[string repeat $colsep [llength $taglist]]
+
+# output header
+append tooutput [format "%13s |" {}]
+foreach elt $taglist {
+   append tooutput [format "%${collen}s |" [string range $elt 0 7]]
+}
+append tooutput \n$linesep
+puts $tooutput
+
+# run each bench and output result
+foreach test $testlist {
+   runtest $mode $test
+   if {$mode eq {profile}} {
+      set tooutput {}
+      set nbprofres [expr {$profprocnb + 1}]
+      for {set i 0} {$i < $nbprofres} {incr i 1} {
+         append tooutput [format "%13s |" [expr {$i == 0 ? $test : {}}]]
+         foreach {tag res} $::testres($test) {
+            set procname [lindex $res [expr {$i * 3}]]
+            set nbcalls [lindex $res [expr {$i * 3 + 1}]]
+            set runtime [lindex $res [expr {$i * 3 + 2}]]
+            append tooutput [format "%29s: %6d %7d |" $procname $nbcalls\
+               $runtime]
+         }
+         append tooutput \n
+      }
+      append tooutput $linesep
+   } else {
+      set tooutput [format "%13s |" $test]
+      foreach {tag res} $::testres($test) {
+         append tooutput [format "%${collen}s |" $res]
+      }
+   }
+   puts $tooutput
+}
+
+# clean built files
+foreach tag $taglist {
+   catch {file delete modulecmd.$tag lib/libtclenvmodules.so.$tag}
+}
+
+# restore workspace if saved
+if {$needstash} {
+   exec git stash pop
+}
+
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent syntax=tcl:

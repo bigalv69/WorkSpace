@@ -1,0 +1,205 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.10-use/%M%
+#   Revision:		%I%
+#   First Edition:	95/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		unuse
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Check removing a path for the list of modulefile
+#			paths in $MODULEPATH
+#			Also it's not an error to unload a bad dir.
+#		}C%
+#
+##############################################################################
+
+#
+# Variables for this test
+#
+
+set path "$env(TESTSUITEDIR)/modulefiles.2"
+set tsdirname [file tail $env(TESTSUITEDIR)]
+regsub "^.*/$tsdirname" $path "$tsdirname" relpath
+regsub "$tsdirname" $relpath "$tsdirname/../$tsdirname/./" relpath_wdot
+set badpath "$env(TESTSUITEDIR)/modulefiles.bad"
+set path_list_header "Search path for module files (in search order):"
+set no_path_list "$warn_msgs: No directories on module search path"
+
+set use	"unuse"
+
+#
+# Put a new entry to unuse to the MODULEPATH
+#
+
+setenv_path_var MODULEPATH $path $modpath
+
+
+#
+# test the bad first
+#
+
+# even if not changed MODULEPATH is refreshed
+set ans [list]
+lappend ans [list set MODULEPATH $path:$modpath]
+testouterr_cmd_re "ALL" "$use $badpath" $ans {}
+
+#
+# The tests ...
+#   do these last so the .modulesbeginenv is left in a good state for 070-Maint
+#
+
+set ans [list]
+lappend ans [list set MODULEPATH $modpath]
+test_cmd_re "ALL" "$use $path" $ans
+
+skip_if_quick_mode
+
+#
+# Insert an empty dir element in MODULEPATH, should be ignored
+#
+
+setenv_path_var MODULEPATH $path {} $modpath
+
+set ans [list]
+# empty dir elements are ignored but stick to the variable, they should be removed
+lappend ans [list set __MODULES_SHARE_MODULEPATH :1]
+lappend ans [list set MODULEPATH ":$modpath"]
+test_cmd_re "sh" "$use $path" $ans
+
+setenv_path_var MODULEPATH $path $modpath
+
+#
+# test with relative-path directory
+# should end with same result as above
+#
+
+set ans [list]
+lappend ans [list set MODULEPATH $modpath]
+test_cmd_re "ALL" "$use $relpath" $ans
+
+#
+# test with relative-path containing useless "." and ".." components
+# should end with same result as above
+#
+
+test_cmd_re "ALL" "$use $relpath_wdot" $ans
+
+#
+# List enabled paths with 2 paths set
+#
+
+testouterr_cmd "ALL" "$use" "OK" "$path_list_header\n  $path\n  $modpath"
+
+#
+# test removing dir enabled multiple times
+#
+
+setenv_path_var MODULEPATH $path $modpath
+setenv_var __MODULES_SHARE_MODULEPATH "$path:2"
+
+# command sent from the command-line by-pass any ref counter
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_MODULEPATH]
+lappend ans [list set MODULEPATH "$modpath"]
+testouterr_cmd "sh" "$use $path" $ans {}
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_MODULEPATH]
+lappend ans [list unset MODULEPATH]
+testouterr_cmd "sh" "$use $modpath $path:/tmp" $ans {}
+
+# erroneous __MODULES_SHARE_ ref counter variable is fixed
+setenv_var __MODULES_SHARE_MODULEPATH "$path:1"
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_MODULEPATH]
+lappend ans [list set MODULEPATH "$modpath"]
+testouterr_cmd sh "$use $path" $ans {}
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_MODULEPATH]
+lappend ans [list unset MODULEPATH]
+testouterr_cmd "sh" "$use $modpath:$path /tmp" $ans {}
+
+setenv_var __MODULES_SHARE_MODULEPATH "$path:0"
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_MODULEPATH]
+lappend ans [list set MODULEPATH "$modpath"]
+testouterr_cmd sh "$use $path" $ans {}
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_MODULEPATH]
+lappend ans [list unset MODULEPATH]
+testouterr_cmd "sh" "$use $modpath $path:/tmp" $ans {}
+
+# no __MODULES_SHARE_ ref counter variable set
+unsetenv_var __MODULES_SHARE_MODULEPATH
+set ans [list]
+lappend ans [list set MODULEPATH "$modpath"]
+testouterr_cmd "sh" "$use $path" $ans {}
+set ans [list]
+lappend ans [list unset MODULEPATH]
+testouterr_cmd "sh" "$use $modpath:$path:/tmp" $ans {}
+
+
+# list paths with no paths set
+setenv_var MODULEPATH ""
+
+testouterr_cmd "ALL" "$use" "OK" "$no_path_list"
+
+#
+# Set empty MODULEPATH with just empty dir element, that should be ignored
+#
+
+setenv_var MODULEPATH ":"
+
+testouterr_cmd "sh" "$use" "OK" "$no_path_list"
+testouterr_cmd "sh" "$use " "ERR" $err_emptydirname
+
+
+#
+# Test usage of variable reference
+#
+
+setenv_path_var MODULEPATH $modpath
+
+set ans [list]
+lappend ans [list set MODULEPATH $modpath]
+testouterr_cmd "sh" "$use \$TESTSUITEDIR/modulefiles.2" $ans {}
+
+setenv_path_var MODULEPATH $modpath \$TESTSUITEDIR/modulefiles.2
+
+testouterr_cmd "sh" "$use \$TESTSUITEDIR/modulefiles.2" $ans {}
+
+set ans [list]
+lappend ans [list set MODULEPATH $modpath:\$TESTSUITEDIR/modulefiles.2]
+testouterr_cmd "sh" "$use $env(TESTSUITEDIR)/modulefiles.2" $ans {}
+
+setenv_path_var MODULEPATH $env(TESTSUITEDIR)/modulefiles.2 $modpath
+
+set ans [list]
+lappend ans [list set MODULEPATH $env(TESTSUITEDIR)/modulefiles.2:$modpath]
+testouterr_cmd "sh" "$use \$TESTSUITEDIR/modulefiles.2" $ans {}
+
+setenv_path_var MODULEPATH $modpath
+
+
+#
+# test path command arguments
+#
+
+testouterr_cmd sh {unuse /tmp --remove-on-unload} ERR [err_invopt --remove-on-unload]
+testouterr_cmd sh {unuse /tmp --append-on-unload /tmp} ERR [err_invopt --append-on-unload]
+testouterr_cmd sh {unuse /tmp --prepend-on-unload /tmp} ERR [err_invopt --prepend-on-unload]
+testouterr_cmd sh {unuse /tmp --noop-on-unload /tmp} ERR [err_invopt --noop-on-unload]
+
+
+#
+# Cleanup
+#
+
+reset_test_env

@@ -1,0 +1,69 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.70-maint/%M%
+#   Revision:		%I%
+#   First Edition:	2018/02/25
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:		display
+#   Modulefiles:	bad2
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests the MODULECONTACT environment variable
+#		}C%
+#
+##############################################################################
+
+skip_if_quick_mode
+
+# skip tests if implicit_default option could not be overridden
+if {[is_config_locked implicit_default]} {
+    send_user "\tskipping tests as implicit_default could not be overridden\n"
+} else {
+
+# ensure avail tests have implicit default enabled
+setenv_var MODULES_IMPLICIT_DEFAULT 1
+
+#
+#  Test variables
+#
+
+set contact "foo@example.org"
+if { $verbose > 0 } {
+    send_user "\tSetup MODULECONTACT = '$contact'\n"
+}
+set env(MODULECONTACT) $contact
+
+set module "bad2"
+set custom {    (procedure "ModulesDisplay" line 2)
+    invoked from within
+"ModulesDisplay"}
+set custom [escre [msg_moderr "$msg_invcmdname \"bad-command\"" bad-command $modpath/$module/proc {} {  } {} $contact $custom]]
+set out_interr "$modlin
+$modpathre/$module/proc:
+
+setenv\t\ttestsuite yes
+module-whatis\t{erroneous module test}
+$custom
+$modlin"
+
+
+#
+#  The tests
+#
+
+testouterr_cmd_re "sh" "display $module" "ERR" "$out_interr"
+
+#
+#  Cleanup
+#
+
+reset_test_env
+
+}

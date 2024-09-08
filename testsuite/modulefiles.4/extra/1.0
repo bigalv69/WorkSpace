@@ -1,0 +1,255 @@
+#%Module
+if {[info exists env(TESTSUITE_EXTRA)]} {
+    switch -- $env(TESTSUITE_EXTRA) {
+        vr1 {
+            variant xtfoo val1 val2 val3
+            variant xtbar val1 val2 val3
+            module-whatis [module-info name]
+        }
+        vr2 {
+            variant xtbar val1 val2 val3
+            module-whatis [module-info name]
+        }
+        setenv1 {
+            setenv XTFOO value
+        }
+        setenv2 {
+            setenv XTFOO value
+            setenv XTBAR value
+        }
+        setenv3 {
+            setenv XTFOO value
+            setenv XTFOO value2
+        }
+        append1 {
+            append-path XTFOO value
+        }
+        prepend1 {
+            prepend-path XTFOO value
+        }
+        remove1 {
+            remove-path XTFOO value
+        }
+        unsetenv1 {
+            unsetenv XTFOO
+        }
+        pushenv1 {
+            pushenv XTFOO value
+        }
+        envvarmix1 - envvarmix2 {
+            setenv XTFOO value
+            append-path XTBAR value
+        }
+        envvarmix3 {
+            setenv XTFOO value
+            append-path XTFOO value
+        }
+        complete1 {
+            complete bash xtfoo value
+        }
+        uncomplete1 {
+            uncomplete xtfoo
+        }
+        alias1 {
+            set-alias xtfoo value
+        }
+        unalias1 {
+            unset-alias xtfoo
+        }
+        function1 {
+            set-function xtfoo value
+        }
+        unfunction1 {
+            unset-function xtfoo
+        }
+        chdir1 {
+            chdir /xtfoo
+        }
+        err1 {
+            setenv {} value
+        }
+        err2 {
+            complete bash {} value
+        }
+        err3 {
+            append-path --unkopt XTFOO value
+        }
+        err4 {
+            set-alias
+        }
+        source1 {
+            source-sh bash testsuite/example/sh-to-mod.sh
+        }
+        family1 {
+            family xtfoo
+        }
+        family2 {
+            family {}
+        }
+        family3 {
+            family xtfoo extraarg
+        }
+        prereq1 - prereqalt1 {
+            prereq xtfoo
+        }
+        prereq2 - prereqalt2 - prereqalt3 {
+            prereq xtfoo/1.0
+        }
+        prereq3 {
+            prereq xtunk
+        }
+        prereq4 {
+            prereq xtunk/1.0
+        }
+        prereqalt4 {
+            prereq alxtfoo
+        }
+        prereqalt5 {
+            prereq xtfoo/1.1
+        }
+        prereq5 {
+            prereq xtfoo/1.0 variant/1.0
+        }
+        prereq6 {
+            prereq xtfoo variant info
+        }
+        prereq7 {
+            prereq xtbar@1.1:2
+        }
+        prereq8 {
+            prereq xtbar@:1.1
+        }
+        prereq9 {
+            prereq xtbar @0.9: bar=val1
+        }
+        prereq10 {
+            prereq xtbar@0.9: bar=val1 xtfoo/1.0
+        }
+        prereq11 {
+            prereq xtbar@0.9: bar=val1 foo=val2 xtfoo/1.0
+        }
+        prereq12 {
+            prereq --optional xtfoo @1.0
+        }
+        prereq13 {
+            prereq --tag footag xtfoo @1.0
+        }
+        prereq14 {
+            prereq
+        }
+        prereq-any1 {
+            prereq-any xtfoo
+        }
+        prereq-all1 {
+            prereq-all xtfoo@0.7: xtbar/1.0
+        }
+        depends-on1 {
+            depends-on xtfoo xtbar bar=val1
+        }
+        always-load1 {
+            always-load xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        load1 {
+            module load xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        load2 {
+            module lo xtfoo@0.7: xtbar/1.0
+        }
+        load3 {
+            module add xtfoo xtbar bar=val1
+        }
+        load4 {
+            module load --foo xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        load5 {
+            module load --tag foo xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        load6 {
+            module load
+        }
+        load7 {
+            module load extra/1.0
+        }
+        load8 {
+            module load xtfoo/1.0
+        }
+        module-err1 {
+            module unk foo
+        }
+        module-err2 {
+            module help foo
+        }
+        module-err3 {
+            module --json avail
+        }
+        module-err4 {
+            module avail --json
+        }
+        module-err5 {
+            module avail --foo
+        }
+        try-load1 {
+            module try-load xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        load-any1 {
+            module load-any xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        unload1 {
+            module unload xtfoo@0.7: xtbar/1.0
+        }
+        unload2 {
+            module rm xtfoo@0.7: xtbar/1.0
+        }
+        conflict1 {
+            conflict xtfoo@0.7:
+        }
+        conflict2 {
+            conflict xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        switch1 {
+            module switch
+        }
+        switch2 {
+            module switch foo bar qux
+        }
+        switch3 {
+            module switch xtfoo xtbar@1.0 bar=val1
+        }
+        switch4 {
+            module swap xtfoo @0.9: xtbar
+        }
+        switch5 {
+            module switch xtfoo @0.9:1.1
+        }
+        switch6 {
+            module switch --tag foo xtbar
+        }
+        switch7 {
+            module switch --tag foo xtfoo xtbar@1.0 bar=val1
+        }
+        uncomplete2 {
+            uncomplete {}
+        }
+        load9 {
+            module load --not-req xtfoo/1.0
+        }
+        unload3 {
+            module unload --not-req xtfoo@0.7: xtbar/1.0
+        }
+        switch8 {
+            module switch --not-req xtfoo xtbar
+        }
+        try-load2 {
+            module try-load --not-req xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        load-any2 {
+            module load-any --not-req xtfoo@0.9: foo=val2 xtbar bar=val1
+        }
+        tag1 - tag2 - tag3 {
+            setenv XTFOO value
+        }
+        tag5 {
+            variant xtfoo val1 val2 val3
+        }
+    }
+}
