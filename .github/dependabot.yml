@@ -6,6 +6,6 @@
 version: 2
 updates:
   - package-github-actions: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+    directory: "C:\Users\Bert\.Github\WorkSpace\Github\directory
     schedule:
       interval: "weekly"
