@@ -1,0 +1,20 @@
+#%Module
+if {[info exists env(TESTSUITE_EXTRA)]} {
+    switch -- $env(TESTSUITE_EXTRA) {
+        dup10 - dup11 {
+            setenv XTFOODUP value
+        }
+    }
+}
+if {[info exists env(TESTSUITE_ABORT_ON_ERROR)]} {
+    switch -- $env(TESTSUITE_ABORT_ON_ERROR) {
+        switch_urequn_sticky - switch_urequn_sticky - unload_switch_urequn_sticky -\
+        unload_switch_urequn_super-sticky {
+            prereq err/1.0
+        }
+        switch_load_urequn_sticky - switch_load_urequn_super-sticky -\
+        unload_switch_load_urequn_sticky - unload_switch_load_urequn_super-sticky {
+            module load err/1.0
+        }
+    }
+}

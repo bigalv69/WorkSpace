@@ -1,0 +1,54 @@
+#%Module
+# This file defines the initial module command configuration, the default
+# modulefiles search path and modulefiles you want to load by default for all
+# users. It should contains lines of module command like 'module config conf
+# val', 'module use path' and 'module load mod'
+module use [getenv TESTSUITEDIR]/modulefiles.deps
+module load mj
+module load m2
+module restore [getenv TESTSUITEDIR]/coll14
+module use "[getenv TESTSUITEDIR]/modulefiles wspace"
+module load {space yc/4}
+module try-load unk
+if {[info exists env(TESTSUITE_INITRC)]} {
+    switch -- $env(TESTSUITE_INITRC) {
+        refcount1 {
+            remove-path BAR /bar
+            append-path FOO /foo
+        }
+        subcmd1 {
+            module refresh
+        }
+        quar1 {
+            module config quarantine_support 1
+        }
+        silentdbg1 {
+            module config silent_shell_debug 1
+        }
+        inprogress1 {
+            module config set_shell_startup 1
+            module use [getenv TESTSUITEDIR]/modulefiles.3
+            module load refresh/5.0
+        }
+        tag1 {
+            module use [getenv TESTSUITEDIR]/modulefiles.3
+            module load foo/0.2
+            module load --tag=foo foo/0.load
+        }
+        subcmd2 {
+            module reset
+        }
+        variant1 {
+            module use [getenv TESTSUITEDIR]/modulefiles.3
+            module load variant/1.0 +foo bar=val1
+        }
+        restorereset1 {
+            module restore
+        }
+        restorereset2 {
+            module restore __init__
+        }
+    }
+}
+catch {module load unk}
+module restore unk

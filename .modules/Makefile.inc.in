@@ -1,0 +1,169 @@
+# Definitions shared across the Makefiles of this project
+# run ./configure to generate Makefile.inc
+
+# set default installation paths
+baseprefix := @baseprefix@
+prefix := @prefix@
+bindir := @bindir@
+libdir := @libdir@
+libexecdir := @libexecdir@
+etcdir := @etcdir@
+initdir := @initdir@
+modulefilesdir := @modulefilesdir@
+datarootdir := @datarootdir@
+mandir := @mandir@
+docdir := @docdir@
+vimdatadir := @vimdatadir@
+nagelfardatadir := @nagelfardatadir@
+moduleshome := @moduleshome@
+
+# versioning mode installation
+versioning := @versioning@
+
+# Modules version
+VERSION := @VERSION@
+
+# modulepaths and modulefiles to enable in default config
+modulepath := @modulepath@
+loadedmodules := @loadedmodules@
+
+# silent shell debug support
+silentshdbgsupport := @silentshdbgsupport@
+# define or not shell startup file to initialize module
+setshellstartup := @setshellstartup@
+# runtime quarantine mechanism
+quarantinesupport := @quarantinesupport@
+quarantinevars := @quarantinevars@
+
+# install Modules Tcl extension library
+libtclenvmodules := @libtclenvmodules@
+SHLIB_SUFFIX := @SHLIB_SUFFIX@
+
+# multi library installation support
+multilibsupport := @multilibsupport@
+libdir64 := @libdir64@
+libdir32 := @libdir32@
+
+# enable or not some specific definition
+setmanpath := @setmanpath@
+appendmanpath := @appendmanpath@
+setbinpath := @setbinpath@
+appendbinpath := @appendbinpath@
+setmodulespath := @setmodulespath@
+docinstall := @docinstall@
+vimaddons  := @vimaddons@
+examplemodulefiles := @examplemodulefiles@
+
+# where to install init config files
+initconfin := @initconfin@
+
+# able to build documentation?
+builddoc := @builddoc@
+# able to use manpath cmd to get currently set manpath
+usemanpath := @usemanpath@
+
+# pager setup
+pager := @pager@
+pageropts := @pageropts@
+
+# default verbosity
+verbosity := @verbosity@
+
+# color setup
+color := @color@
+darkbgcolors := @darkbgcolors@
+lightbgcolors := @lightbgcolors@
+termbg := @termbg@
+
+# automated modules handling
+autohandling := @autohandling@
+
+# implicitly define requirement on module load/module unload modules
+implicitrequirement := @implicitrequirement@
+
+# in depth avail search
+availindepth := @availindepth@
+
+# ignore superseding value for locked configuration options
+lockedconfigs := @lockedconfigs@
+
+# unload lastly or firstly loaded module matching
+unloadmatchorder := @unloadmatchorder@
+
+# implicitly set a default version for modules with none defined
+implicitdefault := @implicitdefault@
+
+# allow partial module version specification
+extendeddefault := @extendeddefault@
+
+# advanced version specification
+advversspec := @advversspec@
+
+# raise error if root name is already loaded
+uniquenameloaded := @uniquenameloaded@
+
+# cache file content evaluated with source command
+sourcecache := @sourcecache@
+
+# module name search matching style
+searchmatch := @searchmatch@
+
+# workaround for Tcsh history issue (#277)
+wa277 := @wa277@
+
+# case sensitiveness match
+icase := @icase@
+
+# ml command enablement
+ml := @ml@
+
+# install Windows-specific files
+windowssupport := @windowssupport@
+
+# days to be considered nearly-forbidden
+nearlyforbiddendays := @nearlyforbiddendays@
+
+# tag abbreviations and coloring properties
+tagabbrev := @tagabbrev@
+tagcolorname := @tagcolorname@
+
+# error behaviors
+stickypurge := @stickypurge@
+abortonerror := @abortonerror@
+
+# check version on magic cookie
+mcookieversioncheck := @mcookieversioncheck@
+
+# output configuration
+availoutput := @availoutput@
+availterseoutput := @availterseoutput@
+listoutput := @listoutput@
+listterseoutput := @listterseoutput@
+
+# variant configuration
+variantshortcut := @variantshortcut@
+
+# editor
+editor := @editor@
+
+# shell completion location
+bashcompletiondir := @bashcompletiondir@
+fishcompletiondir := @fishcompletiondir@
+zshcompletiondir := @zshcompletiondir@
+
+# linter setup
+nagelfaraddons  := @nagelfaraddons@
+tcllinter := @tcllinter@
+tcllinteropts := @tcllinteropts@
+
+# command location
+TCLSH := @TCLSH@
+PYTHON := @PYTHON@
+SPHINXBUILD := @SPHINXBUILD@
+PS := @PS@
+BASENAME := @BASENAME@
+
+# specific command option support
+RMDIR_IGN_NON_EMPTY := @RMDIR_IGN_NON_EMPTY@
+SED_ERE := @SED_ERE@
+

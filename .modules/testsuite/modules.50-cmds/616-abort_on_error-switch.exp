@@ -1,0 +1,2726 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	2023/11/19
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:		switch
+#   Modulefiles:    err, foo, all, setenv
+#   Sub-Command:
+#
+#   Comment:	%C{
+#           Test error when several modulefiles are evaluated with
+#           switch sub-command
+#		}C%
+#
+##############################################################################
+
+skip_if_quick_mode
+
+set mp $modpath.4
+set mpre $modpathre.4
+setenv_path_var MODULEPATH $mp
+
+setenv_var MODULES_AUTO_HANDLING 1
+
+set ans_unload_fail_forced [list]
+lappend ans_unload_fail_forced [list set _LMFILES_ $mp/foo/1.0]
+lappend ans_unload_fail_forced [list set LOADEDMODULES foo/1.0]
+
+set ans_load_fail_depre [list]
+lappend ans_load_fail_depre [list set TS1 {}]
+lappend ans_load_fail_depre [list set TS2 {}]
+lappend ans_load_fail_depre [list set LOADEDMODULES setenv/1.0]
+lappend ans_load_fail_depre [list set _LMFILES_ $mp/setenv/1.0]
+lappend ans_load_fail_depre [list unset __MODULES_LMPREREQ]
+lappend ans_load_fail_depre [list ERR]
+
+set ans_unload_fail_depre_force [list]
+lappend ans_unload_fail_depre_force [list set TS1 {}]
+lappend ans_unload_fail_depre_force [list set TS2 {}]
+lappend ans_unload_fail_depre_force [list set __MODULES_LMPREREQ err/1.0&err/1.0|foo]
+lappend ans_unload_fail_depre_force [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0]
+lappend ans_unload_fail_depre_force [list set LOADEDMODULES setenv/1.0:err/1.0]
+
+set ans_unload_fail_depun_force [list]
+lappend ans_unload_fail_depun_force [list set TS1 {}]
+lappend ans_unload_fail_depun_force [list set TS2 {}]
+lappend ans_unload_fail_depun_force [list set __MODULES_LMPREREQ err/1.0&foo]
+lappend ans_unload_fail_depun_force [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0]
+lappend ans_unload_fail_depun_force [list set LOADEDMODULES setenv/1.0:err/1.0]
+
+set ans_sticky_force [list]
+lappend ans_sticky_force [list set _LMFILES_ $mp/foo/1.0]
+lappend ans_sticky_force [list set LOADEDMODULES foo/1.0]
+lappend ans_sticky_force [list unset __MODULES_LMTAG]
+
+set ans_unload_fail_continue [list]
+lappend ans_unload_fail_continue [list set _LMFILES_ $mp/err/1.0:$mp/foo/1.0]
+lappend ans_unload_fail_continue [list set LOADEDMODULES err/1.0:foo/1.0]
+lappend ans_unload_fail_continue [list ERR]
+
+set ans_unload_fail_depre_continue [list]
+lappend ans_unload_fail_depre_continue [list set TS1 {}]
+lappend ans_unload_fail_depre_continue [list set TS2 {}]
+lappend ans_unload_fail_depre_continue [list set _LMFILES_ $mp/foo/1.0:$mp/err/1.0:$mp/setenv/1.0]
+lappend ans_unload_fail_depre_continue [list set LOADEDMODULES foo/1.0:err/1.0:setenv/1.0]
+lappend ans_unload_fail_depre_continue [list ERR]
+
+set ans_unload_fail_depun_continue $ans_unload_fail_depre_continue
+
+set ans_both_fail_forced [list]
+lappend ans_both_fail_forced [list unset LOADEDMODULES]
+lappend ans_both_fail_forced [list unset _LMFILES_]
+lappend ans_both_fail_forced [list ERR]
+
+set ans_both_continue [list]
+lappend ans_both_continue [list set _LMFILES_ $mp/err/1.0]
+lappend ans_both_continue [list set LOADEDMODULES err/1.1]
+
+set ans_sticky_forbidden_forbidden_force [list]
+lappend ans_sticky_forbidden_force [list unset _LMFILES_]
+lappend ans_sticky_forbidden_force [list unset LOADEDMODULES]
+lappend ans_sticky_forbidden_force [list unset __MODULES_LMTAG]
+lappend ans_sticky_forbidden_force [list ERR]
+
+set ans_load_continue [list]
+lappend ans_load_continue [list set _LMFILES_ $mp/err/1.0]
+lappend ans_load_continue [list set LOADEDMODULES err/1.0]
+
+set ans_forbidden_forbidden_force [list]
+lappend ans_forbidden_force [list unset _LMFILES_]
+lappend ans_forbidden_force [list unset LOADEDMODULES]
+lappend ans_forbidden_force [list ERR]
+
+set ans_load_fail_continue $ans_both_fail_forced
+
+set ans_unload_not_loaded [list]
+lappend ans_unload_not_loaded [list set _LMFILES_ $mp/foo/1.0]
+lappend ans_unload_not_loaded [list set LOADEDMODULES foo/1.0]
+
+set ans_same_module $ans_unload_not_loaded
+
+set ans_forbidden_forbidden_force [list]
+lappend ans_load_not_exist [list unset _LMFILES_]
+lappend ans_load_not_exist [list unset LOADEDMODULES]
+lappend ans_load_not_exist [list ERR]
+
+set ans_load_already_loaded [list]
+lappend ans_load_already_loaded [list set _LMFILES_ $mp/setenv/1.0]
+lappend ans_load_already_loaded [list set LOADEDMODULES setenv/1.0]
+
+set ans_mfile_unload_bad [list]
+lappend ans_mfile_unload_bad [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_mfile_unload_bad [list set __MODULES_LMPREREQ lerr/1.0&foo/1.0]
+lappend ans_mfile_unload_bad [list set _LMFILES_ $mp/foo/1.0:$mp/lerr/1.0]
+lappend ans_mfile_unload_bad [list set LOADEDMODULES foo/1.0:lerr/1.0]
+lappend ans_mfile_unload_bad [list set __MODULES_LMTAG foo/1.0&auto-loaded]
+
+set ans_sub_mfile_unload_bad [list]
+lappend ans_sub_mfile_unload_bad [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_sub_mfile_unload_bad [list set __MODULES_LMPREREQ lerr/1.0&foo/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_unload_bad [list set _LMFILES_ $mp/foo/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_unload_bad [list set LOADEDMODULES foo/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_unload_bad [list set __MODULES_LMTAG foo/1.0&auto-loaded:lerr/1.0&auto-loaded]
+
+set ans_mfile_both_error [list]
+lappend ans_mfile_both_error [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_mfile_both_error [list set __MODULES_LMPREREQ lerr/1.0&err/1.1]
+lappend ans_mfile_both_error [list set LOADEDMODULES lerr/1.0]
+lappend ans_mfile_both_error [list set _LMFILES_ $mp/lerr/1.0]
+lappend ans_mfile_both_error [list ERR]
+
+set ans_sub_mfile_both_error [list]
+lappend ans_sub_mfile_both_error [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_sub_mfile_both_error [list set __MODULES_LMPREREQ lerr/1.0&err/1.1:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_both_error [list set LOADEDMODULES lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_both_error [list set _LMFILES_ $mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_both_error [list set __MODULES_LMTAG lerr/1.0&auto-loaded]
+lappend ans_sub_mfile_both_error [list ERR]
+
+set ans_mfile_depre_break [list]
+lappend ans_mfile_depre_break [list set TS1 {}]
+lappend ans_mfile_depre_break [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_mfile_depre_break [list set TS2 {}]
+lappend ans_mfile_depre_break [list set LOADEDMODULES setenv/1.0:lerr/1.0]
+lappend ans_mfile_depre_break [list set _LMFILES_ $mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_mfile_depre_break [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_mfile_depre_break [list set __MODULES_LMTAG setenv/1.0&auto-loaded]
+lappend ans_mfile_depre_break [list ERR]
+
+set ans_sub_mfile_depre_break [list]
+lappend ans_sub_mfile_depre_break [list set TS1 {}]
+lappend ans_sub_mfile_depre_break [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_mfile_depre_break [list set TS2 {}]
+lappend ans_sub_mfile_depre_break [list set LOADEDMODULES setenv/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_depre_break [list set _LMFILES_ $mp/setenv/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_depre_break [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_depre_break [list set __MODULES_LMTAG setenv/1.0&auto-loaded:lerr/1.0&auto-loaded]
+lappend ans_sub_mfile_depre_break [list ERR]
+
+set ans_mfile_depun_break [list]
+lappend ans_mfile_depun_break [list set TS1 {}]
+lappend ans_mfile_depun_break [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_mfile_depun_break [list set TS2 {}]
+lappend ans_mfile_depun_break [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0]
+lappend ans_mfile_depun_break [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0:$mp/lerr/1.0]
+lappend ans_mfile_depun_break [list set LOADEDMODULES setenv/1.0:err/1.0:lerr/1.0]
+lappend ans_mfile_depun_break [list set __MODULES_LMTAG setenv/1.0&auto-loaded]
+
+set ans_sub_mfile_depun_break [list]
+lappend ans_sub_mfile_depun_break [list set TS1 {}]
+lappend ans_sub_mfile_depun_break [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_mfile_depun_break [list set TS2 {}]
+lappend ans_sub_mfile_depun_break [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_depun_break [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_depun_break [list set LOADEDMODULES setenv/1.0:err/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_depun_break [list set __MODULES_LMTAG setenv/1.0&auto-loaded:lerr/1.0&auto-loaded]
+
+set ans_mfile_load_forbidden [list]
+lappend ans_mfile_load_forbidden [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_mfile_load_forbidden [list set __MODULES_LMPREREQ lerr/1.0&err/1.0]
+lappend ans_mfile_load_forbidden [list set _LMFILES_ $mp/lerr/1.0]
+lappend ans_mfile_load_forbidden [list set LOADEDMODULES lerr/1.0]
+lappend ans_mfile_load_forbidden [list ERR]
+
+set ans_sub_mfile_load_forbidden [list]
+lappend ans_sub_mfile_load_forbidden [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_mfile_load_forbidden [list set __MODULES_LMPREREQ lerr/1.0&err/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_load_forbidden [list set _LMFILES_ $mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_load_forbidden [list set LOADEDMODULES lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_load_forbidden [list set __MODULES_LMTAG lerr/1.0&auto-loaded]
+lappend ans_sub_mfile_load_forbidden [list ERR]
+
+set ans_mfile_unload_sticky $ans_mfile_unload_bad
+
+set ans_sub_mfile_unload_sticky $ans_sub_mfile_unload_bad
+
+set ans_mfile_unload_super_sticky [list]
+lappend ans_mfile_unload_super_sticky [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_mfile_unload_super_sticky [list set __MODULES_LMPREREQ lerr/1.0&foo/1.0]
+lappend ans_mfile_unload_super_sticky [list set _LMFILES_ $mp/err/1.0:$mp/foo/1.0:$mp/lerr/1.0]
+lappend ans_mfile_unload_super_sticky [list set LOADEDMODULES err/1.0:foo/1.0:lerr/1.0]
+lappend ans_mfile_unload_super_sticky [list set __MODULES_LMTAG err/1.0&super-sticky:foo/1.0&auto-loaded]
+lappend ans_mfile_unload_super_sticky [list ERR]
+
+set ans_sub_mfile_unload_super_sticky [list]
+lappend ans_sub_mfile_unload_super_sticky [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_sub_mfile_unload_super_sticky [list set __MODULES_LMPREREQ lerr/1.0&foo/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_unload_super_sticky [list set _LMFILES_ $mp/err/1.0:$mp/foo/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_unload_super_sticky [list set LOADEDMODULES err/1.0:foo/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_unload_super_sticky [list set __MODULES_LMTAG err/1.0&super-sticky:foo/1.0&auto-loaded:lerr/1.0&auto-loaded]
+lappend ans_sub_mfile_unload_super_sticky [list ERR]
+
+set ans_mfile_unload_not_loaded $ans_mfile_unload_bad
+
+set ans_sub_mfile_unload_not_loaded $ans_sub_mfile_unload_bad
+
+set ans_mfile_load_already_loaded [list]
+lappend ans_mfile_load_already_loaded [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_mfile_load_already_loaded [list set __MODULES_LMPREREQ lerr/1.0&foo/1.0]
+lappend ans_mfile_load_already_loaded [list set _LMFILES_ $mp/foo/1.0:$mp/lerr/1.0]
+lappend ans_mfile_load_already_loaded [list set LOADEDMODULES foo/1.0:lerr/1.0]
+
+set ans_sub_mfile_load_already_loaded [list]
+lappend ans_sub_mfile_load_already_loaded [list set __MODULES_LMCONFLICT lerr/1.0&err/1.0]
+lappend ans_sub_mfile_load_already_loaded [list set __MODULES_LMPREREQ lerr/1.0&foo/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_mfile_load_already_loaded [list set _LMFILES_ $mp/foo/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_mfile_load_already_loaded [list set LOADEDMODULES foo/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_mfile_load_already_loaded [list set __MODULES_LMTAG lerr/1.0&auto-loaded]
+
+set ans_unload_mfile_error [list]
+lappend ans_unload_mfile_error [list unset __MODULES_LMCONFLICT]
+lappend ans_unload_mfile_error [list set LOADEDMODULES err/1.0]
+lappend ans_unload_mfile_error [list set _LMFILES_ $mp/err/1.0]
+lappend ans_unload_mfile_error [list unset __MODULES_LMPREREQ]
+
+set ans_unload_sub_mfile_error [list]
+lappend ans_unload_sub_mfile_error [list unset __MODULES_LMCONFLICT]
+lappend ans_unload_sub_mfile_error [list set LOADEDMODULES err/1.0]
+lappend ans_unload_sub_mfile_error [list set _LMFILES_ $mp/err/1.0]
+lappend ans_unload_sub_mfile_error [list unset __MODULES_LMPREREQ]
+lappend ans_unload_sub_mfile_error [list set __MODULES_LMTAG err/1.0&auto-loaded]
+
+set ans_unload_sub_mfile_error_noauto [list]
+lappend ans_unload_sub_mfile_error_noauto [list unset __MODULES_LMCONFLICT]
+lappend ans_unload_sub_mfile_error_noauto [list unset __MODULES_LMPREREQ]
+lappend ans_unload_sub_mfile_error_noauto [list set _LMFILES_ $mp/err/1.0]
+lappend ans_unload_sub_mfile_error_noauto [list set LOADEDMODULES err/1.0]
+lappend ans_unload_sub_mfile_error_noauto [list set __MODULES_LMTAG err/1.0&auto-loaded]
+
+set ans_unload_mfile_error_force [list]
+lappend ans_unload_mfile_error_force [list unset __MODULES_LMCONFLICT]
+lappend ans_unload_mfile_error_force [list unset __MODULES_LMPREREQ]
+lappend ans_unload_mfile_error_force [list unset _LMFILES_]
+lappend ans_unload_mfile_error_force [list unset LOADEDMODULES]
+lappend ans_unload_mfile_error_force [list unset __MODULES_LMTAG]
+
+set ans_modfile_depun_sticky [list]
+lappend ans_modfile_depun_sticky [list set TS1 {}]
+lappend ans_modfile_depun_sticky [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_depun_sticky [list set TS2 {}]
+lappend ans_modfile_depun_sticky [list set LOADEDMODULES setenv/1.0:lerr/1.0]
+lappend ans_modfile_depun_sticky [list set _LMFILES_ $mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_depun_sticky [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_modfile_depun_sticky [list set __MODULES_LMTAG setenv/1.0&auto-loaded]
+lappend ans_modfile_depun_sticky [list ERR]
+
+set ans_sub_modfile_depun_sticky [list]
+lappend ans_sub_modfile_depun_sticky [list set TS1 {}]
+lappend ans_sub_modfile_depun_sticky [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_depun_sticky [list set TS2 {}]
+lappend ans_sub_modfile_depun_sticky [list set LOADEDMODULES setenv/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_modfile_depun_sticky [list set _LMFILES_ $mp/setenv/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_modfile_depun_sticky [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_modfile_depun_sticky [list set __MODULES_LMTAG setenv/1.0&auto-loaded:lerr/1.0&auto-loaded]
+lappend ans_sub_modfile_depun_sticky [list ERR]
+
+set ans_modfile_depun_sticky_force [list]
+lappend ans_modfile_depun_sticky_force [list set TS1 {}]
+lappend ans_modfile_depun_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_depun_sticky_force [list set TS2 {}]
+lappend ans_modfile_depun_sticky_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0]
+lappend ans_modfile_depun_sticky_force [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0:$mp/lerr/1.0]
+lappend ans_modfile_depun_sticky_force [list set LOADEDMODULES setenv/1.0:err/1.0:lerr/1.0]
+lappend ans_modfile_depun_sticky_force [list set __MODULES_LMTAG setenv/1.0&auto-loaded:err/1.0&sticky]
+
+set ans_sub_modfile_depun_sticky_force [list]
+lappend ans_sub_modfile_depun_sticky_force [list set TS1 {}]
+lappend ans_sub_modfile_depun_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_depun_sticky_force [list set TS2 {}]
+lappend ans_sub_modfile_depun_sticky_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_modfile_depun_sticky_force [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_modfile_depun_sticky_force [list set LOADEDMODULES setenv/1.0:err/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_modfile_depun_sticky_force [list set __MODULES_LMTAG setenv/1.0&auto-loaded:err/1.0&sticky:lerr/1.0&auto-loaded]
+
+set ans_modfile_depun_super_sticky_force [list]
+lappend ans_modfile_depun_super_sticky_force [list set TS1 {}]
+lappend ans_modfile_depun_super_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_depun_super_sticky_force [list set TS2 {}]
+lappend ans_modfile_depun_super_sticky_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0]
+lappend ans_modfile_depun_super_sticky_force [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0:$mp/lerr/1.0]
+lappend ans_modfile_depun_super_sticky_force [list set LOADEDMODULES setenv/1.0:err/1.0:lerr/1.0]
+lappend ans_modfile_depun_super_sticky_force [list set __MODULES_LMTAG setenv/1.0&auto-loaded:err/1.0&super-sticky]
+
+set ans_sub_modfile_depun_super_sticky_force [list]
+lappend ans_sub_modfile_depun_super_sticky_force [list set TS1 {}]
+lappend ans_sub_modfile_depun_super_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_depun_super_sticky_force [list set TS2 {}]
+lappend ans_sub_modfile_depun_super_sticky_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_modfile_depun_super_sticky_force [list set _LMFILES_ $mp/setenv/1.0:$mp/err/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_modfile_depun_super_sticky_force [list set LOADEDMODULES setenv/1.0:err/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_modfile_depun_super_sticky_force [list set __MODULES_LMTAG setenv/1.0&auto-loaded:err/1.0&super-sticky:lerr/1.0&auto-loaded]
+
+set ans_modfile_depun_sticky_noauto_force [list]
+lappend ans_modfile_depun_sticky_noauto_force [list set TS1 {}]
+lappend ans_modfile_depun_sticky_noauto_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set TS2 {}]
+lappend ans_modfile_depun_sticky_noauto_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set __MODULES_LMTAG err/1.0&sticky:setenv/1.0&auto-loaded]
+
+set ans_modfile_depun_sticky_noauto_force [list]
+lappend ans_modfile_depun_sticky_noauto_force [list set TS1 {}]
+lappend ans_modfile_depun_sticky_noauto_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set TS2 {}]
+lappend ans_modfile_depun_sticky_noauto_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_depun_sticky_noauto_force [list set __MODULES_LMTAG err/1.0&sticky:setenv/1.0&auto-loaded]
+
+set ans_modfile_depun_super_sticky_noauto_force [list]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set TS1 {}]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set TS2 {}]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set __MODULES_LMPREREQ err/1.0&foo:lerr/1.0&setenv/1.0]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_depun_super_sticky_noauto_force [list set __MODULES_LMTAG err/1.0&super-sticky:setenv/1.0&auto-loaded]
+
+set ans_modfile_unload_depun_sticky [list]
+lappend ans_modfile_unload_depun_sticky [list unset __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_unload_depun_sticky [list set __MODULES_LMPREREQ err/1.0&foo]
+lappend ans_modfile_unload_depun_sticky [list set _LMFILES_ $mp/foo/1.0:$mp/err/1.0]
+lappend ans_modfile_unload_depun_sticky [list set LOADEDMODULES foo/1.0:err/1.0]
+
+set ans_sub_modfile_unload_depun_sticky [list]
+lappend ans_sub_modfile_unload_depun_sticky [list unset __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_unload_depun_sticky [list set __MODULES_LMPREREQ err/1.0&foo]
+lappend ans_sub_modfile_unload_depun_sticky [list set _LMFILES_ $mp/foo/1.0:$mp/err/1.0]
+lappend ans_sub_modfile_unload_depun_sticky [list set LOADEDMODULES foo/1.0:err/1.0]
+lappend ans_sub_modfile_unload_depun_sticky [list set __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&sticky]
+
+set ans_sub_modfile_unload_depun_super_sticky [list]
+lappend ans_sub_modfile_unload_depun_super_sticky [list unset __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_unload_depun_super_sticky [list set __MODULES_LMPREREQ err/1.0&foo]
+lappend ans_sub_modfile_unload_depun_super_sticky [list set _LMFILES_ $mp/foo/1.0:$mp/err/1.0]
+lappend ans_sub_modfile_unload_depun_super_sticky [list set LOADEDMODULES foo/1.0:err/1.0]
+lappend ans_sub_modfile_unload_depun_super_sticky [list set __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&super-sticky]
+
+set ans_modfile_urequn_sticky [list]
+lappend ans_modfile_urequn_sticky [list set TS1 {}]
+lappend ans_modfile_urequn_sticky [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_urequn_sticky [list set TS2 {}]
+lappend ans_modfile_urequn_sticky [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_urequn_sticky [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_urequn_sticky [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_modfile_urequn_sticky [list set __MODULES_LMTAG err/1.0&auto-loaded&sticky:setenv/1.0&auto-loaded]
+
+set ans_sub_modfile_urequn_sticky [list]
+lappend ans_sub_modfile_urequn_sticky [list set TS1 {}]
+lappend ans_sub_modfile_urequn_sticky [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_urequn_sticky [list set TS2 {}]
+lappend ans_sub_modfile_urequn_sticky [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_modfile_urequn_sticky [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_modfile_urequn_sticky [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_modfile_urequn_sticky [list set __MODULES_LMTAG err/1.0&auto-loaded&sticky:setenv/1.0&auto-loaded:lerr/1.0&auto-loaded]
+
+set ans_modfile_urequn_sticky_force [list]
+lappend ans_modfile_urequn_sticky_force [list set TS1 {}]
+lappend ans_modfile_urequn_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_urequn_sticky_force [list set TS2 {}]
+lappend ans_modfile_urequn_sticky_force [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_modfile_urequn_sticky_force [list set _LMFILES_ $mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_urequn_sticky_force [list set LOADEDMODULES setenv/1.0:lerr/1.0]
+lappend ans_modfile_urequn_sticky_force [list set __MODULES_LMTAG setenv/1.0&auto-loaded]
+
+set ans_sub_modfile_urequn_sticky_force [list]
+lappend ans_sub_modfile_urequn_sticky_force [list set TS1 {}]
+lappend ans_sub_modfile_urequn_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_urequn_sticky_force [list set TS2 {}]
+lappend ans_sub_modfile_urequn_sticky_force [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_modfile_urequn_sticky_force [list set _LMFILES_ $mp/setenv/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_modfile_urequn_sticky_force [list set LOADEDMODULES setenv/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_modfile_urequn_sticky_force [list set __MODULES_LMTAG setenv/1.0&auto-loaded:lerr/1.0&auto-loaded]
+
+set ans_modfile_urequn_super_sticky_force [list]
+lappend ans_modfile_urequn_super_sticky_force [list set TS1 {}]
+lappend ans_modfile_urequn_super_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_urequn_super_sticky_force [list set TS2 {}]
+lappend ans_modfile_urequn_super_sticky_force [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_urequn_super_sticky_force [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_urequn_super_sticky_force [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_modfile_urequn_super_sticky_force [list set __MODULES_LMTAG err/1.0&auto-loaded&super-sticky:setenv/1.0&auto-loaded]
+
+set ans_sub_modfile_urequn_super_sticky_force [list]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set TS1 {}]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set TS2 {}]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0:llerr/1.0]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0:$mp/llerr/1.0]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0:llerr/1.0&lerr/1.0]
+lappend ans_sub_modfile_urequn_super_sticky_force [list set __MODULES_LMTAG err/1.0&auto-loaded&super-sticky:setenv/1.0&auto-loaded:lerr/1.0&auto-loaded]
+
+set ans_modfile_urequn_sticky_noauto [list]
+lappend ans_modfile_urequn_sticky_noauto [list set TS1 {}]
+lappend ans_modfile_urequn_sticky_noauto [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_urequn_sticky_noauto [list set TS2 {}]
+lappend ans_modfile_urequn_sticky_noauto [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_modfile_urequn_sticky_noauto [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_urequn_sticky_noauto [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_urequn_sticky_noauto [list set __MODULES_LMTAG err/1.0&auto-loaded&sticky:setenv/1.0&auto-loaded]
+
+set ans_modfile_urequn_super_sticky_noauto [list]
+lappend ans_modfile_urequn_super_sticky_noauto [list set TS1 {}]
+lappend ans_modfile_urequn_super_sticky_noauto [list set __MODULES_LMCONFLICT lerr/1.0&foo/1.0]
+lappend ans_modfile_urequn_super_sticky_noauto [list set TS2 {}]
+lappend ans_modfile_urequn_super_sticky_noauto [list set __MODULES_LMPREREQ lerr/1.0&setenv/1.0]
+lappend ans_modfile_urequn_super_sticky_noauto [list set _LMFILES_ $mp/err/1.0:$mp/setenv/1.0:$mp/lerr/1.0]
+lappend ans_modfile_urequn_super_sticky_noauto [list set LOADEDMODULES err/1.0:setenv/1.0:lerr/1.0]
+lappend ans_modfile_urequn_super_sticky_noauto [list set __MODULES_LMTAG err/1.0&auto-loaded&super-sticky:setenv/1.0&auto-loaded]
+
+set ans_modfile_unload_urequn_sticky [list]
+lappend ans_modfile_unload_urequn_sticky [list unset __MODULES_LMCONFLICT]
+lappend ans_modfile_unload_urequn_sticky [list set LOADEDMODULES err/1.0]
+lappend ans_modfile_unload_urequn_sticky [list set _LMFILES_ $mp/err/1.0]
+lappend ans_modfile_unload_urequn_sticky [list unset __MODULES_LMPREREQ]
+lappend ans_modfile_unload_urequn_sticky [list set __MODULES_LMTAG err/1.0&auto-loaded&sticky]
+
+set ans_modfile_unload_urequn_sticky_force [list]
+lappend ans_modfile_unload_urequn_sticky_force [list unset __MODULES_LMCONFLICT]
+lappend ans_modfile_unload_urequn_sticky_force [list unset __MODULES_LMPREREQ]
+lappend ans_modfile_unload_urequn_sticky_force [list unset _LMFILES_]
+lappend ans_modfile_unload_urequn_sticky_force [list unset LOADEDMODULES]
+lappend ans_modfile_unload_urequn_sticky_force [list unset __MODULES_LMTAG]
+
+set ans_modfile_unload_urequn_super_sticky [list]
+lappend ans_modfile_unload_urequn_super_sticky [list unset __MODULES_LMCONFLICT]
+lappend ans_modfile_unload_urequn_super_sticky [list set LOADEDMODULES err/1.0]
+lappend ans_modfile_unload_urequn_super_sticky [list set _LMFILES_ $mp/err/1.0]
+lappend ans_modfile_unload_urequn_super_sticky [list unset __MODULES_LMPREREQ]
+lappend ans_modfile_unload_urequn_super_sticky [list set __MODULES_LMTAG err/1.0&auto-loaded&super-sticky]
+
+set ans_modfile_unload_urequn_sticky_noauto [list]
+lappend ans_modfile_unload_urequn_sticky_noauto [list unset __MODULES_LMCONFLICT]
+lappend ans_modfile_unload_urequn_sticky_noauto [list unset __MODULES_LMPREREQ]
+lappend ans_modfile_unload_urequn_sticky_noauto [list set _LMFILES_ $mp/err/1.0]
+lappend ans_modfile_unload_urequn_sticky_noauto [list set LOADEDMODULES err/1.0]
+lappend ans_modfile_unload_urequn_sticky_noauto [list set __MODULES_LMTAG err/1.0&auto-loaded&sticky]
+
+set ans_modfile_unload_urequn_super_sticky_noauto_force [list]
+lappend ans_modfile_unload_urequn_super_sticky_noauto_force [list unset __MODULES_LMCONFLICT]
+lappend ans_modfile_unload_urequn_super_sticky_noauto_force [list unset __MODULES_LMPREREQ]
+lappend ans_modfile_unload_urequn_super_sticky_noauto_force [list set _LMFILES_ $mp/err/1.0]
+lappend ans_modfile_unload_urequn_super_sticky_noauto_force [list set LOADEDMODULES err/1.0]
+lappend ans_modfile_unload_urequn_super_sticky_noauto_force [list set __MODULES_LMTAG err/1.0&auto-loaded&super-sticky]
+
+
+set custom_error_trace "    invoked from within
+\"if \{\[info exists env(TESTSUITE_ABORT_ON_ERROR)\]\} \{
+    switch -- \$env(TESTSUITE_ABORT_ON_ERROR) \{
+        bad - load_last_bad - load_first_bad - load-...\""
+
+
+#
+# failure on 1 unloading module, abort behavior for unload phase
+#
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_bad
+
+set ts_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_bad
+
+set ts_bad_warn [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_bad_warn
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_break
+
+set ts_break [msg_unload err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_break
+
+set ts_break_warn [msg_unload err/1.0 $warn_evalabort]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_exit
+
+set ts_exit [msg_unload err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_exit
+
+set ts_exit_warn [msg_unload err/1.0 $warn_evalabort]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_forced {}
+
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_error
+
+set ts_error_verbose [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0 -v} ERR $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_load foo/1.0]\n
+append ts_error_verbose_warn [msg_switch err/1.0 foo/1.0]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0 -v} $ans_unload_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_unload_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_error [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_error [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_error
+
+set ts_depre_unload_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_error_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_bad
+
+set ts_depre_unload_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_bad [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_bad [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_bad
+
+set ts_depre_unload_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_bad_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_break
+
+set ts_depre_unload_break [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_unload_break [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_break [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_break
+
+set ts_depre_unload_break_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_unload_break_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_exit
+
+set ts_depre_unload_exit [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_unload_exit [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_exit [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_exit
+
+set ts_depre_unload_break_exit [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_unload_break_exit [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_break_exit
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_error
+
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+set ts_depun_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_error \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_error \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_error
+
+set ts_depun_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_error_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_error_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_bad
+
+set ts_depun_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_bad \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_bad \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_bad
+
+set ts_depun_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_bad_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_bad_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_break
+
+set ts_depun_break [msg_unload err/1.0 $err_evalabort]
+append ts_depun_break \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_break \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_break
+
+set ts_depun_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_break_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_break_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_exit
+
+set ts_depun_exit [msg_unload err/1.0 $err_evalabort]
+append ts_depun_exit \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_exit \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_exit
+
+set ts_depun_exit_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_exit_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_exit_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_exit_force
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky
+
+set ts_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]\n\n
+append ts_sticky [msg_switch {err/1.0 <S>} foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_sticky
+
+set ts_sticky_warn [msg_unload {err/1.0 <S>} $err_stickyunloadf]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_sticky_force $ts_sticky_warn
+
+
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR super-sticky
+
+set ts_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]\n\n
+append ts_super_sticky [msg_switch {err/1.0 <sS>} foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_super_sticky
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} ERR $ts_super_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# failure on 1 unloading module, abort behavior for both phases
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_bad
+
+set ts_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_bad
+
+set ts_bad_warn [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_bad_warn
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_break
+
+set ts_break [msg_unload err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_break
+
+set ts_break_warn [msg_unload err/1.0 $warn_evalabort]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_exit
+
+set ts_exit [msg_unload err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_exit
+
+set ts_exit_warn [msg_unload err/1.0 $warn_evalabort]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_forced {}
+
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_error
+
+set ts_error_verbose [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0 -v} ERR $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_load foo/1.0]\n
+append ts_error_verbose_warn [msg_switch err/1.0 foo/1.0]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0 -v} $ans_unload_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_unload_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_error [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_error [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_error
+
+set ts_depre_unload_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_error_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_bad
+
+set ts_depre_unload_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_bad [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_bad [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_bad
+
+set ts_depre_unload_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_bad_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_break
+
+set ts_depre_unload_break [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_unload_break [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_break [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_break
+
+set ts_depre_unload_break_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_unload_break_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_exit
+
+set ts_depre_unload_exit [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_unload_exit [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_exit [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_unload_exit
+
+set ts_depre_unload_break_exit [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_unload_break_exit [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_break_exit
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_error
+
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+set ts_depun_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_error \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_error \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_error
+
+set ts_depun_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_error_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_error_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_bad
+
+set ts_depun_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_bad \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_bad \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_bad
+
+set ts_depun_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_bad_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_bad_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_break
+
+set ts_depun_break [msg_unload err/1.0 $err_evalabort]
+append ts_depun_break \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_break \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_break
+
+set ts_depun_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_break_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_break_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_exit
+
+set ts_depun_exit [msg_unload err/1.0 $err_evalabort]
+append ts_depun_exit \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_exit \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depun_exit
+
+set ts_depun_exit_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_exit_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_exit_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_exit_force
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky
+
+set ts_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]\n\n
+append ts_sticky [msg_switch {err/1.0 <S>} foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_sticky
+
+set ts_sticky_warn [msg_unload {err/1.0 <S>} $err_stickyunloadf]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_sticky_force $ts_sticky_warn
+
+
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR super-sticky
+
+set ts_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]\n\n
+append ts_super_sticky [msg_switch {err/1.0 <sS>} foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_super_sticky
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} ERR $ts_super_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# failure on 1 unloading module, continue behavior
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_bad
+
+set ts_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_continue $ts_bad
+
+set ts_bad_warn [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_bad_warn
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_break
+
+set ts_break [msg_unload err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_continue $ts_break
+
+set ts_break_warn [msg_unload err/1.0 $warn_evalabort]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_exit
+
+set ts_exit [msg_unload err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_continue $ts_exit
+
+set ts_exit_warn [msg_unload err/1.0 $warn_evalabort]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_forced {}
+
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_unload_fail_forced {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_error
+
+set ts_error_verbose [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_load foo/1.0]
+append ts_error_verbose \n\n[msg_switch err/1.0 foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0 -v} $ans_unload_fail_continue $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_load foo/1.0]\n
+append ts_error_verbose_warn [msg_switch err/1.0 foo/1.0]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0 -v} $ans_unload_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_unload_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_error [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_error [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_unload_error
+
+set ts_depre_unload_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_error_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_bad
+
+set ts_depre_unload_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_bad [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_bad [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_unload_bad
+
+set ts_depre_unload_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_unload_bad_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_break
+
+set ts_depre_unload_break [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_unload_break [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_break [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_unload_break
+
+set ts_depre_unload_break_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_unload_break_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_unload_exit
+
+set ts_depre_unload_exit [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_unload_exit [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_unload_exit [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_unload_exit
+
+set ts_depre_unload_break_exit [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_unload_break_exit [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depre_force $ts_depre_unload_break_exit
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_error
+
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+set ts_depun_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_error \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_error \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depun_continue $ts_depun_error
+
+set ts_depun_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_error_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_error_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_bad
+
+set ts_depun_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_bad \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_bad \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depun_continue $ts_depun_bad
+
+set ts_depun_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depun_bad_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_bad_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_break
+
+set ts_depun_break [msg_unload err/1.0 $err_evalabort]
+append ts_depun_break \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_break \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depun_continue $ts_depun_break
+
+set ts_depun_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_break_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_break_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depun_exit
+
+set ts_depun_exit [msg_unload err/1.0 $err_evalabort]
+append ts_depun_exit \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_exit \n\n[msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depun_continue $ts_depun_exit
+
+set ts_depun_exit_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_exit_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_exit_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} err/1.0]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_unload_fail_depun_force $ts_depun_exit_force
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky
+
+set ts_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]\n\n
+append ts_sticky [msg_switch {err/1.0 <S>} foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} $ans_unload_fail_continue $ts_sticky
+
+set ts_sticky_warn [msg_unload {err/1.0 <S>} $err_stickyunloadf]
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} $ans_sticky_force $ts_sticky_warn
+
+
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR super-sticky
+
+set ts_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]\n\n
+append ts_super_sticky [msg_switch {err/1.0 <sS>} foo/1.0 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 foo/1.0} ERR $ts_super_sticky
+testouterr_cmd bash {switch --force err/1.0 foo/1.0} ERR $ts_super_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# failure on 1 loading module, abort behavior for both phases
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR bad
+
+set ts_bad [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0} ERR $ts_bad
+
+set ts_bad_warn [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_both_fail_forced $ts_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR break
+
+set ts_break [msg_load err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0} ERR $ts_break
+
+set ts_break_warn [msg_load err/1.0 $err_evalabort]
+append ts_break_warn \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_both_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR exit
+
+set ts_exit [msg_load err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0} ERR $ts_exit
+
+set ts_exit_warn [msg_load err/1.0 $err_evalabort]
+append ts_exit_warn \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_both_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch foo/1.0 err/1.0} $ans_load_continue {}
+
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_load_continue {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR error
+
+set ts_error_verbose [msg_unload foo/1.0]\n\n
+append ts_error_verbose [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0 -v} ERR $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload foo/1.0]\n\n
+append ts_error_verbose_warn [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0 -v} $ans_both_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_load_error [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error \n\n[msg_switch foo/1.0 setenv/1.0 [err_depre err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_error
+
+set ts_depre_load_error_warn [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_warn \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_error_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_bad
+
+set ts_depre_load_bad [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad [msg_switch foo/1.0 setenv/1.0 [err_depre err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_bad
+
+set ts_depre_load_bad_warn [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_warn [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_break
+
+set ts_depre_load_break [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break [msg_switch foo/1.0 setenv/1.0 [err_depre err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_break
+
+set ts_depre_load_break_warn [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break_warn [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_exit
+
+set ts_depre_load_exit [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit [msg_switch foo/1.0 setenv/1.0 [err_depre err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_exit
+
+set ts_depre_load_exit_warn [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit_warn [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_exit_warn
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky_forbidden_diff
+
+set ts_forbidden [msg_switch foo/1.0 err/1.1 [err_accessdenied err/1.1]]
+testouterr_cmd bash {switch foo/1.0 err/1.1} ERR $ts_forbidden
+
+testouterr_cmd bash {switch --force foo/1.0 err/1.1} $ans_forbidden_force $ts_forbidden
+
+unsetenv_loaded_module
+
+
+#
+# failure on 1 loading module, continue behavior
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR bad
+
+set ts_bad [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0} $ans_load_fail_continue $ts_bad
+
+set ts_bad_warn [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_both_fail_forced $ts_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR break
+
+set ts_break [msg_load err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0} $ans_load_fail_continue $ts_break
+
+set ts_break_warn [msg_load err/1.0 $err_evalabort]
+append ts_break_warn \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_both_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR exit
+
+set ts_exit [msg_load err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0} $ans_load_fail_continue $ts_exit
+
+set ts_exit_warn [msg_load err/1.0 $err_evalabort]
+append ts_exit_warn \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_both_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch foo/1.0 err/1.0} $ans_load_continue {}
+
+testouterr_cmd bash {switch --force foo/1.0 err/1.0} $ans_load_continue {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR error
+
+set ts_error_verbose [msg_unload foo/1.0]\n\n
+append ts_error_verbose [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch foo/1.0 err/1.0 -v} $ans_load_fail_continue $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload foo/1.0]\n\n
+append ts_error_verbose_warn [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_switch foo/1.0 err/1.0 [err_swon err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 err/1.0 -v} $ans_both_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_load_error_warn [msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_warn \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_error_warn
+
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_error_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_bad
+
+set ts_depre_load_bad_warn [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_warn [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_bad_warn
+
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_break
+
+set ts_depre_load_break_warn [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break_warn [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_break_warn
+
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_load_exit
+
+set ts_depre_load_exit_warn [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit_warn [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_exit_warn
+
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_exit_warn
+
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky_forbidden_diff
+
+set ts_forbidden [msg_switch foo/1.0 err/1.1 [err_accessdenied err/1.1]]
+testouterr_cmd bash {switch foo/1.0 err/1.1} $ans_forbidden_force $ts_forbidden
+
+testouterr_cmd bash {switch --force foo/1.0 err/1.1} $ans_forbidden_force $ts_forbidden
+
+unsetenv_loaded_module
+
+
+#
+# failure on 1 unloading module and 1 loading module, continue behavior
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR bad
+
+set ts_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_load err/1.1 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0] [err_swon err/1.1]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_bad
+
+set ts_bad_warn [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_load err/1.1 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR break
+
+set ts_break [msg_unload err/1.0 $err_evalabort]
+append ts_break \n\n[msg_load err/1.1 $err_evalabort]
+append ts_break \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0] [err_swon err/1.1]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_break
+
+set ts_break_warn [msg_unload err/1.0 $warn_evalabort]
+append ts_break_warn \n\n[msg_load err/1.1 $err_evalabort]
+append ts_break_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR exit
+
+set ts_exit [msg_unload err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_load err/1.1 $err_evalabort]
+append ts_exit \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0] [err_swon err/1.1]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_exit
+
+set ts_exit_warn [msg_unload err/1.0 $warn_evalabort]
+append ts_exit_warn \n\n[msg_load err/1.1 $err_evalabort]
+append ts_exit_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch err/1.0 err/1.1} $ans_both_continue {}
+
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_continue {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR error
+
+set ts_error_verbose [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_load err/1.1 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0] [err_swon err/1.1]]
+testouterr_cmd bash {switch err/1.0 err/1.1 -v} ERR $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_load err/1.1 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1 -v} $ans_both_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_load_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_error [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_error [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_load_error
+
+set ts_depre_load_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_force \n\n[msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_bad
+
+set ts_depre_load_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_bad [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_load_bad
+
+set ts_depre_load_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_force [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_break
+
+set ts_depre_load_break [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_break [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_load_break
+
+set ts_depre_load_break_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_load_break_force [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_exit
+
+set ts_depre_load_exit [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_exit [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_unload_fail_depre_continue $ts_depre_load_exit
+
+set ts_depre_load_exit_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_load_exit_force [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_exit_force
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky_forbidden_diff
+
+set ts_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]\n\n
+append ts_sticky [msg_switch {err/1.0 <S>} err/1.1 [err_swoff err/1.0] [err_accessdenied err/1.1]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_sticky
+
+set ts_sticky_warn [msg_unload {err/1.0 <S>} $err_stickyunloadf]\n\n
+append ts_sticky_warn [msg_switch {err/1.0 <S>} err/1.1 [err_accessdenied err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_sticky_forbidden_force $ts_sticky_warn
+
+
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR super-sticky_forbidden_diff
+
+set ts_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]\n\n
+append ts_super_sticky [msg_switch {err/1.0 <sS>} err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_super_sticky
+testouterr_cmd bash {switch --force err/1.0 err/1.1} ERR $ts_super_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# failure on 1 unloading module and 1 loading module, abort behavior for unload phase
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch_unload
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR bad
+
+set ts_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_bad
+
+set ts_bad_warn [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_load err/1.1 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR break
+
+set ts_break [msg_unload err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_break
+
+set ts_break_warn [msg_unload err/1.0 $warn_evalabort]
+append ts_break_warn \n\n[msg_load err/1.1 $err_evalabort]
+append ts_break_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR exit
+
+set ts_exit [msg_unload err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_exit
+
+set ts_exit_warn [msg_unload err/1.0 $warn_evalabort]
+append ts_exit_warn \n\n[msg_load err/1.1 $err_evalabort]
+append ts_exit_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch err/1.0 err/1.1} $ans_both_continue {}
+
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_continue {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR error
+
+set ts_error_verbose [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1 -v} ERR $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_load err/1.1 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1 -v} $ans_both_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_load_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_error [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_error [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_error
+
+set ts_depre_load_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_force \n\n[msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_bad
+
+set ts_depre_load_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_bad [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_bad
+
+set ts_depre_load_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_force [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_break
+
+set ts_depre_load_break [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_break [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_break
+
+set ts_depre_load_break_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_load_break_force [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_exit
+
+set ts_depre_load_exit [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_exit [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_exit
+
+set ts_depre_load_exit_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_load_exit_force [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_exit_force
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky_forbidden_diff
+
+set ts_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]
+append ts_sticky \n\n[msg_switch {err/1.0 <S>} err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_sticky
+
+set ts_sticky_warn [msg_unload {err/1.0 <S>} $err_stickyunloadf]\n\n
+append ts_sticky_warn [msg_switch {err/1.0 <S>} err/1.1 [err_accessdenied err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_sticky_forbidden_force $ts_sticky_warn
+
+
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR super-sticky_forbidden_diff
+
+set ts_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]
+append ts_super_sticky \n\n[msg_switch {err/1.0 <sS>} err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_super_sticky
+testouterr_cmd bash {switch --force err/1.0 err/1.1} ERR $ts_super_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# failure on 1 unloading module and 1 loading module, abort behavior for both phases
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+
+setenv_var TESTSUITE_ABORT_ON_ERROR bad
+
+set ts_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_bad
+
+set ts_bad_warn [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_load err/1.1 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_bad_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_bad_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR break
+
+set ts_break [msg_unload err/1.0 $err_evalabort]
+append ts_break \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_break
+
+set ts_break_warn [msg_unload err/1.0 $warn_evalabort]
+append ts_break_warn \n\n[msg_load err/1.1 $err_evalabort]
+append ts_break_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_break_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR exit
+
+set ts_exit [msg_unload err/1.0 $err_evalabort]
+append ts_exit \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_exit
+
+set ts_exit_warn [msg_unload err/1.0 $warn_evalabort]
+append ts_exit_warn \n\n[msg_load err/1.1 $err_evalabort]
+append ts_exit_warn \n\n[msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_fail_forced $ts_exit_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR continue
+
+testouterr_cmd bash {switch err/1.0 err/1.1} $ans_both_continue {}
+
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_both_continue {}
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR error
+
+set ts_error_verbose [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_error_verbose \n\n[msg_switch err/1.0 err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1 -v} ERR $ts_error_verbose
+
+set ts_error_verbose_warn [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_load err/1.1 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_error_verbose_warn [msg_switch err/1.0 err/1.1 [err_swon err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1 -v} $ans_both_fail_forced $ts_error_verbose_warn
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_error
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_load_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_error [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_error [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_error
+
+set ts_depre_load_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_force \n\n[msg_load err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_depre_load_error_force \n\n[msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_error_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_bad
+
+set ts_depre_load_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_bad [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_bad
+
+set ts_depre_load_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_force [msg_load err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]\n\n
+append ts_depre_load_bad_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_bad_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_break
+
+set ts_depre_load_break [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_break [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_break
+
+set ts_depre_load_break_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_load_break_force [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_break_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_break_force
+
+
+setenv_var TESTSUITE_ABORT_ON_ERROR depre_exit
+
+set ts_depre_load_exit [msg_unload err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit [msg_unload foo/1.0 [err_depun err/1.0]]\n\n
+append ts_depre_load_exit [msg_switch foo/1.0 setenv/1.0 [err_swoff foo/1.0]]
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} ERR $ts_depre_load_exit
+
+set ts_depre_load_exit_force [msg_unload err/1.0 $warn_evalabort]\n\n
+append ts_depre_load_exit_force [msg_load err/1.0 $err_evalabort]\n\n
+append ts_depre_load_exit_force [msg_top_switch foo/1.0 setenv/1.0 {} {} {} {} {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {switch --force foo/1.0 setenv/1.0} $ans_load_fail_depre $ts_depre_load_exit_force
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+
+
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR sticky_forbidden_diff
+
+set ts_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]
+append ts_sticky \n\n[msg_switch {err/1.0 <S>} err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_sticky
+
+set ts_sticky_warn [msg_unload {err/1.0 <S>} $err_stickyunloadf]\n\n
+append ts_sticky_warn [msg_switch {err/1.0 <S>} err/1.1 [err_accessdenied err/1.1]]
+testouterr_cmd bash {switch --force err/1.0 err/1.1} $ans_sticky_forbidden_force $ts_sticky_warn
+
+
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR super-sticky_forbidden_diff
+
+set ts_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]
+append ts_super_sticky \n\n[msg_switch {err/1.0 <sS>} err/1.1 [err_swoff err/1.0]]
+testouterr_cmd bash {switch err/1.0 err/1.1} ERR $ts_super_sticky
+testouterr_cmd bash {switch --force err/1.0 err/1.1} ERR $ts_super_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# not loaded/already loaded/same module, abort behavior for unload phase
+#
+
+unsetenv_loaded_module
+unsetenv_var TESTSUITE_ABORT_ON_ERROR
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch_unload
+
+# switch-off module not loaded
+testouterr_cmd bash {switch setenv/1.0 foo/1.0} $ans_unload_not_loaded {}
+testouterr_cmd bash {switch --force setenv/1.0 foo/1.0} $ans_unload_not_loaded {}
+
+# switch-off module not loaded and does not exist
+testouterr_cmd bash {switch unk/1.0 foo/1.0} $ans_unload_not_loaded {}
+testouterr_cmd bash {switch --force unk/1.0 foo/1.0} $ans_unload_not_loaded {}
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+
+# same module to switch-off and switch-on
+testouterr_cmd bash {switch foo/1.0 foo/1.0} $ans_same_module {}
+testouterr_cmd bash {switch --force foo/1.0 foo/1.0} $ans_same_module {}
+
+# switch-on module does not exit
+set ts_load_not_exist [msg_switch foo/1.0 unk/1.0 $err_path'unk/1.0']
+testouterr_cmd bash {switch foo/1.0 unk/1.0} $ans_load_not_exist $ts_load_not_exist
+testouterr_cmd bash {switch --force foo/1.0 unk/1.0} $ans_load_not_exist $ts_load_not_exist
+
+# switch-off module not loaded, switch-on module already loaded
+testouterr_cmd bash {switch setenv/1.0 foo/1.0} OK {}
+testouterr_cmd bash {switch --force setenv/1.0 foo/1.0} OK {}
+
+setenv_loaded_module [list foo/1.0 setenv/1.0] [list $mp/foo/1.0 $mp/setenv/1.0]
+
+# switch-on module already loaded
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_already_loaded {}
+
+
+#
+# not loaded/already loaded/same module, abort behavior for both phases
+#
+
+unsetenv_loaded_module
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch
+
+# switch-off module not loaded
+testouterr_cmd bash {switch setenv/1.0 foo/1.0} $ans_unload_not_loaded {}
+testouterr_cmd bash {switch --force setenv/1.0 foo/1.0} $ans_unload_not_loaded {}
+
+# switch-off module not loaded and does not exist
+testouterr_cmd bash {switch unk/1.0 foo/1.0} $ans_unload_not_loaded {}
+testouterr_cmd bash {switch --force unk/1.0 foo/1.0} $ans_unload_not_loaded {}
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+
+# same module to switch-off and switch-on
+testouterr_cmd bash {switch foo/1.0 foo/1.0} $ans_same_module {}
+testouterr_cmd bash {switch --force foo/1.0 foo/1.0} $ans_same_module {}
+
+# switch-on module does not exit
+set ts_load_not_exist [msg_switch foo/1.0 unk/1.0 $err_path'unk/1.0']
+testouterr_cmd bash {switch foo/1.0 unk/1.0} ERR $ts_load_not_exist
+testouterr_cmd bash {switch --force foo/1.0 unk/1.0} $ans_load_not_exist $ts_load_not_exist
+
+# switch-off module not loaded, switch-on module already loaded
+testouterr_cmd bash {switch setenv/1.0 foo/1.0} OK {}
+testouterr_cmd bash {switch --force setenv/1.0 foo/1.0} OK {}
+
+setenv_loaded_module [list foo/1.0 setenv/1.0] [list $mp/foo/1.0 $mp/setenv/1.0]
+
+# switch-on module already loaded
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_already_loaded {}
+
+
+#
+# not loaded/already loaded/same module, continue behavior
+#
+
+unsetenv_loaded_module
+setenv_var MODULES_ABORT_ON_ERROR ml:reload
+
+# switch-off module not loaded
+testouterr_cmd bash {switch setenv/1.0 foo/1.0} $ans_unload_not_loaded {}
+testouterr_cmd bash {switch --force setenv/1.0 foo/1.0} $ans_unload_not_loaded {}
+
+# switch-off module not loaded and does not exist
+testouterr_cmd bash {switch unk/1.0 foo/1.0} $ans_unload_not_loaded {}
+testouterr_cmd bash {switch --force unk/1.0 foo/1.0} $ans_unload_not_loaded {}
+
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+
+# same module to switch-off and switch-on
+testouterr_cmd bash {switch foo/1.0 foo/1.0} $ans_same_module {}
+testouterr_cmd bash {switch --force foo/1.0 foo/1.0} $ans_same_module {}
+
+# switch-on module does not exit
+set ts_load_not_exist [msg_switch foo/1.0 unk/1.0 $err_path'unk/1.0']
+testouterr_cmd bash {switch foo/1.0 unk/1.0} $ans_load_not_exist $ts_load_not_exist
+testouterr_cmd bash {switch --force foo/1.0 unk/1.0} $ans_load_not_exist $ts_load_not_exist
+
+# switch-off module not loaded, switch-on module already loaded
+testouterr_cmd bash {switch setenv/1.0 foo/1.0} OK {}
+testouterr_cmd bash {switch --force setenv/1.0 foo/1.0} OK {}
+
+setenv_loaded_module [list foo/1.0 setenv/1.0] [list $mp/foo/1.0 $mp/setenv/1.0]
+
+# switch-on module already loaded
+testouterr_cmd bash {switch foo/1.0 setenv/1.0} $ans_load_already_loaded {}
+
+
+#
+# module switch in modulefile, abort behavior for unload phase (no change on modulefile cmd)
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch_unload
+
+# bad code on unloading module
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_unload_bad
+
+set ts_unload_bad [msg_unload err/1.0 [msg_moderr {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_unload_bad \n\n[msg_load lerr/1.0 [err_conun err/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_bad
+
+set ts_unload_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_unload_bad_force \n\n[msg_top_load lerr/1.0 err/1.0 foo/1.0 {}]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_bad $ts_unload_bad_force
+
+
+# error on unloading and loading modules
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_both_error
+
+set ts_both_error [msg_unload err/1.0 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_both_error \n\n[msg_load lerr/1.0 [err_conun err/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_both_error
+
+set ts_both_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_both_error_force \n\n[msg_load err/1.1 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_both_error_force \n\n[msg_top_load lerr/1.0 err/1.0 {} {} [err_reqlof err/1.1]]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_both_error $ts_both_error_force
+
+
+# dependent reload module breaks on unload and load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_break [msg_unload err/1.0 $err_evalabort]
+append ts_depre_break \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depre_break \n\n[msg_load lerr/1.0 [err_conun foo/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_depre_break
+
+set ts_depre_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depre_break_force \n\n[msg_load err/1.0 $err_evalabort]
+append ts_depre_break_force \n\n[msg_top_load lerr/1.0 foo/1.0 setenv/1.0 {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depre_break $ts_depre_break_force
+
+
+# dependent reload module breaks on load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_load_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_depre_load_break [msg_load err/1.0 $err_evalabort]
+append ts_depre_load_break \n\n[msg_top_load lerr/1.0 {foo/1.0} {setenv/1.0} {{err/1.0} {}} [err_depref err/1.0]]
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_depre_break $ts_depre_load_break
+
+set ts_depre_load_break_force [msg_load err/1.0 $err_evalabort]
+append ts_depre_load_break_force \n\n[msg_top_load lerr/1.0 foo/1.0 setenv/1.0 {err/1.0 {}} [err_depref err/1.0]]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depre_break $ts_depre_load_break_force
+
+
+# dependent unload module breaks on unload
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+set ts_depun_break [msg_unload err/1.0 $err_evalabort]
+append ts_depun_break \n\n[msg_unload foo/1.0 [err_depun err/1.0]]
+append ts_depun_break \n\n[msg_load lerr/1.0 [err_conun foo/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_depun_break
+
+set ts_depun_break_noauto [msg_unload foo/1.0 [err_prerequn err/1.0]]
+append ts_depun_break_noauto \n\n[msg_load lerr/1.0 [err_conun foo/1.0]]
+testouterr_cmd bash {load --no-auto lerr/1.0} ERR $ts_depun_break_noauto
+
+set ts_depun_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_depun_break_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_depun_break_force \n\n[msg_top_load lerr/1.0 foo/1.0 setenv/1.0 err/1.0]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depun_break $ts_depun_break_force
+
+
+# loading module forbidden
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_forbidden
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+unsetenv_var __MODULES_LMPREREQ
+
+set ts_load_forbidden [msg_load lerr/1.0 [err_accessdenied err/1.0] [err_reqlo err/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_load_forbidden
+
+set ts_load_forbidden_force [msg_top_load lerr/1.0 foo/1.0 {} {} [err_accessdenied err/1.0] [err_reqlof err/1.0]]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_load_forbidden $ts_load_forbidden_force
+
+
+# unloading module is sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+set ts_unload_sticky [msg_unload {err/1.0 <S>} $err_stickyunload]\n\n[msg_load lerr/1.0 [err_conun err/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_sticky
+
+set ts_unload_sticky_force [msg_unload {err/1.0 <S>} $err_stickyunloadf]
+append ts_unload_sticky_force \n\n[msg_top_load lerr/1.0 err/1.0 foo/1.0 {}]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_sticky $ts_unload_sticky_force
+
+
+# unloading module is super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_super-sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+set ts_unload_super_sticky [msg_unload {err/1.0 <sS>} $err_superstickyunload]\n\n[msg_load lerr/1.0 [err_conun err/1.0]]
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_super_sticky
+
+set ts_unload_super_sticky_force [msg_unload {err/1.0 <sS>} $err_superstickyunload]\n\n[msg_top_load lerr/1.0 {} foo/1.0 {} [err_conunf err/1.0]]
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_super_sticky $ts_unload_super_sticky_force
+
+
+# unloading module not loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_not_loaded
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+set ts_unload_not_loaded [msg_top_load lerr/1.0 {} foo/1.0 {}]
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_unload_not_loaded $ts_unload_not_loaded
+
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_not_loaded $ts_unload_not_loaded
+
+
+# loading module already loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_already_loaded
+setenv_loaded_module [list err/1.0 foo/1.0] [list $mp/err/1.0 $mp/foo/1.0]
+
+set ts_load_already_loaded [msg_top_load lerr/1.0 err/1.0 {} {}]
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_load_already_loaded $ts_load_already_loaded
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_load_already_loaded $ts_load_already_loaded
+
+
+# error during unload of switch-on module when unloading modulefile that "module switch"
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_error
+setenv_loaded_module [list err/1.0 lerr/1.0] [list $mp/err/1.0 $mp/lerr/1.0]
+setenv_var __MODULES_LMPREREQ lerr/1.0&err/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&foo/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded
+
+set ts_unload_mfile_error [msg_unload {err/1.0 <aL>} [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_unload_mfile_error \n\n[msg_unload lerr/1.0 [err_urequn err/1.0]]
+testouterr_cmd bash {unload lerr/1.0} $ans_unload_mfile_error $ts_unload_mfile_error
+
+set ts_unload_mfile_error_force [msg_unload {err/1.0 <aL>} [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_unload_mfile_error_force \n\n[msg_top_unload lerr/1.0 {} err/1.0 {}]
+testouterr_cmd bash {unload --force lerr/1.0} $ans_unload_mfile_error_force $ts_unload_mfile_error_force
+
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# module switch in modulefile, abort behavior for both phases (no change on modulefile cmd)
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload:switch
+
+# bad code on unloading module
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_unload_bad
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_bad
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_bad $ts_unload_bad_force
+
+
+# error on unloading and loading modules
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_both_error
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_both_error
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_both_error $ts_both_error_force
+
+
+# dependent reload module breaks on unload and load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_depre_break
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depre_break $ts_depre_break_force
+
+
+# dependent unload module breaks on unload
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_depun_break
+testouterr_cmd bash {load --no-auto lerr/1.0} ERR $ts_depun_break_noauto
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depun_break $ts_depun_break_force
+
+
+# dependent reload module breaks on load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_load_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_depre_break $ts_depre_load_break
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depre_break $ts_depre_load_break_force
+
+
+# loading module forbidden
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_forbidden
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+unsetenv_var __MODULES_LMPREREQ
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_load_forbidden
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_load_forbidden $ts_load_forbidden_force
+
+
+# unloading module is sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_sticky
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_sticky $ts_unload_sticky_force
+
+
+# unloading module is super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_super-sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_super_sticky
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_super_sticky $ts_unload_super_sticky_force
+
+
+# unloading module not loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_not_loaded
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_unload_not_loaded $ts_unload_not_loaded
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_not_loaded $ts_unload_not_loaded
+
+
+# loading module already loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_already_loaded
+setenv_loaded_module [list err/1.0 foo/1.0] [list $mp/err/1.0 $mp/foo/1.0]
+
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_load_already_loaded $ts_load_already_loaded
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_load_already_loaded $ts_load_already_loaded
+
+
+# error during unload of switch-on module when unloading modulefile that "module switch"
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_error
+setenv_loaded_module [list err/1.0 lerr/1.0] [list $mp/err/1.0 $mp/lerr/1.0]
+setenv_var __MODULES_LMPREREQ lerr/1.0&err/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&foo/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded
+
+testouterr_cmd bash {unload lerr/1.0} $ans_unload_mfile_error $ts_unload_mfile_error
+testouterr_cmd bash {unload --force lerr/1.0} $ans_unload_mfile_error_force $ts_unload_mfile_error_force
+
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# module switch in modulefile, continue behavior (no change on modulefile cmd)
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload
+
+# bad code on unloading module
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_unload_bad
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_bad
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_bad $ts_unload_bad_force
+
+
+# error on unloading and loading modules
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_both_error
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_both_error
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_both_error $ts_both_error_force
+
+
+# dependent reload module breaks on unload and load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_depre_break
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depre_break $ts_depre_break_force
+
+
+# dependent unload module breaks on unload
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_depun_break
+testouterr_cmd bash {load --no-auto lerr/1.0} ERR $ts_depun_break_noauto
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depun_break $ts_depun_break_force
+
+
+# dependent reload module breaks on load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_load_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_depre_break $ts_depre_load_break
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_depre_break $ts_depre_load_break_force
+
+
+# loading module forbidden
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_forbidden
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+unsetenv_var __MODULES_LMPREREQ
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_load_forbidden
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_load_forbidden $ts_load_forbidden_force
+
+
+# unloading module is sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_sticky
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_sticky $ts_unload_sticky_force
+
+
+# unloading module is super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_super-sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+testouterr_cmd bash {load lerr/1.0} ERR $ts_unload_super_sticky
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_super_sticky $ts_unload_super_sticky_force
+
+
+# unloading module not loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_not_loaded
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_unload_not_loaded $ts_unload_not_loaded
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_unload_not_loaded $ts_unload_not_loaded
+
+
+# loading module already loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_already_loaded
+setenv_loaded_module [list err/1.0 foo/1.0] [list $mp/err/1.0 $mp/foo/1.0]
+
+testouterr_cmd bash {load lerr/1.0} $ans_mfile_load_already_loaded $ts_load_already_loaded
+testouterr_cmd bash {load --force lerr/1.0} $ans_mfile_load_already_loaded $ts_load_already_loaded
+
+
+# error during unload of switch-on module when unloading modulefile that "module switch"
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_error
+setenv_loaded_module [list err/1.0 lerr/1.0] [list $mp/err/1.0 $mp/lerr/1.0]
+setenv_var __MODULES_LMPREREQ lerr/1.0&err/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&foo/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded
+
+testouterr_cmd bash {unload lerr/1.0} $ans_unload_mfile_error $ts_unload_mfile_error
+testouterr_cmd bash {unload --force lerr/1.0} $ans_unload_mfile_error_force $ts_unload_mfile_error_force
+
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# dependent unload mechanism with sticky modules when loading modulefile doing module switch
+#
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+# dependent module to unload is sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_sticky
+
+set ts_switch_depun_sticky [msg_load {err/1.0} [err_reqmis foo]]
+append ts_switch_depun_sticky \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {{err/1.0} {}} [err_depref err/1.0]]
+testouterr_cmd bash {load lerr/1.0} $ans_modfile_depun_sticky $ts_switch_depun_sticky
+
+set ts_switch_depun_sticky_force [msg_load {err/1.0 <S>} [err_reqmisf foo]]
+append ts_switch_depun_sticky_force \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {err/1.0}]
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_depun_sticky_force $ts_switch_depun_sticky_force
+
+# dependent module to unload is super-sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+set ts_switch_depun_super_sticky_force [msg_load {err/1.0 <sS>} [err_reqmisf foo]]
+append ts_switch_depun_super_sticky_force \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {err/1.0}]
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_depun_super_sticky_force $ts_switch_depun_super_sticky_force
+
+
+# dependent module to unload is sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_load_depun_sticky
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+testouterr_cmd bash {load lerr/1.0} $ans_modfile_depun_sticky $ts_switch_depun_sticky
+
+set ts_switch_depun_sticky_noauto [msg_unload {foo/1.0} [err_prerequn err/1.0]]
+append ts_switch_depun_sticky_noauto \n\n[msg_load {lerr/1.0} [err_conun foo/1.0]]
+testouterr_cmd bash {load --no-auto lerr/1.0} ERR $ts_switch_depun_sticky_noauto
+
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_depun_sticky_force $ts_switch_depun_sticky_force
+
+set ts_switch_depun_sticky_noauto_force [msg_unload {foo/1.0} [err_deplof err/1.0]]
+append ts_switch_depun_sticky_noauto_force \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {}]
+testouterr_cmd bash {load --no-auto --force lerr/1.0} $ans_modfile_depun_sticky_noauto_force $ts_switch_depun_sticky_noauto_force
+
+
+# dependent module to unload is super-sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_load_depun_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_depun_super_sticky_force $ts_switch_depun_super_sticky_force
+
+testouterr_cmd bash {load --no-auto --force lerr/1.0} $ans_modfile_depun_super_sticky_noauto_force $ts_switch_depun_sticky_noauto_force
+
+
+#
+# dependent unload mechanism with sticky modules when unloading modulefile doing module switch
+#
+
+setenv_loaded_module [list foo/1.0 lerr/1.0 err/1.0] [list $mp/foo/1.0 $mp/lerr/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ lerr/1.0&foo/1.0:err/1.0&foo
+setenv_var __MODULES_LMCONFLICT lerr/1.0&setenv/1.0
+setenv_var __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&sticky
+
+# dependent module to unload is sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_depun_sticky
+
+testouterr_cmd bash {unload lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+# dependent module to unload is super-sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_depun_super-sticky
+setenv_var __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&super-sticky
+
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+
+# dependent module to unload is sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_depun_sticky
+setenv_var __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&sticky
+
+testouterr_cmd bash {unload lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+testouterr_cmd bash {unload --no-auto lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+testouterr_cmd bash {unload --no-auto --force lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+
+# dependent module to unload is super-sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_depun_super-sticky
+setenv_var __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&super-sticky
+
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+testouterr_cmd bash {unload --no-auto --force lerr/1.0} $ans_modfile_unload_depun_sticky {}
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# useless requirement unload mechanism with sticky modules when loading modulefile doing module switch
+#
+
+setenv_loaded_module [list err/1.0 foo/1.0] [list $mp/err/1.0 $mp/foo/1.0]
+setenv_var __MODULES_LMPREREQ foo/1.0&err/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&sticky
+
+# dependent module to unload is sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_urequn_sticky
+
+set ts_switch_urequn_sticky [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_switch_urequn_sticky \n\n[msg_unload {foo/1.0} [err_urequn err/1.0]]
+append ts_switch_urequn_sticky \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {}]
+testouterr_cmd bash {load lerr/1.0} $ans_modfile_urequn_sticky $ts_switch_urequn_sticky
+
+set ts_switch_urequn_sticky_force [msg_unload {err/1.0 <aL:S>} $err_stickyunloadf]
+append ts_switch_urequn_sticky_force \n\n[msg_top_load {lerr/1.0} {} {setenv/1.0} {} {Unloading conflict: foo/1.0} {Unloading useless requirement: err/1.0}]
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_urequn_sticky_force $ts_switch_urequn_sticky_force
+
+# dependent module to unload is super-sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_urequn_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&super-sticky
+
+set ts_switch_urequn_super_sticky_force [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_switch_urequn_super_sticky_force \n\n[msg_unload {foo/1.0} [err_urequn err/1.0]]
+append ts_switch_urequn_super_sticky_force \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {}]
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_urequn_super_sticky_force $ts_switch_urequn_super_sticky_force
+
+
+# dependent module to unload is sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_load_urequn_sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&sticky
+
+testouterr_cmd bash {load lerr/1.0} $ans_modfile_urequn_sticky $ts_switch_urequn_sticky
+
+set ts_switch_urequn_sticky_noauto [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_switch_urequn_sticky_noauto \n\n[msg_unload {foo/1.0} [err_urequn err/1.0]]
+append ts_switch_urequn_sticky_noauto \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {}]
+testouterr_cmd bash {load --no-auto lerr/1.0} $ans_modfile_urequn_sticky_noauto $ts_switch_urequn_sticky_noauto
+
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_urequn_sticky_force $ts_switch_urequn_sticky_force
+
+testouterr_cmd bash {load --no-auto --force lerr/1.0} $ans_modfile_urequn_sticky_force $ts_switch_urequn_sticky_force
+
+
+# dependent module to unload is super-sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_load_urequn_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&super-sticky
+
+testouterr_cmd bash {load --force lerr/1.0} $ans_modfile_urequn_super_sticky_force $ts_switch_urequn_super_sticky_force
+
+set ts_switch_urequn_super_sticky_force_noauto [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_switch_urequn_super_sticky_force_noauto \n\n[msg_unload {foo/1.0} [err_urequn err/1.0]]
+append ts_switch_urequn_super_sticky_force_noauto \n\n[msg_top_load {lerr/1.0} {foo/1.0} {setenv/1.0} {}]
+testouterr_cmd bash {load --no-auto --force lerr/1.0} $ans_modfile_urequn_super_sticky_noauto $ts_switch_urequn_super_sticky_force_noauto
+
+
+#
+# useless requirement unload mechanism with sticky modules when unloading modulefile doing module switch
+#
+
+setenv_loaded_module [list err/1.0 foo/1.0 lerr/1.0] [list $mp/err/1.0 $mp/foo/1.0 $mp/lerr/1.0]
+setenv_var __MODULES_LMPREREQ foo/1.0&err/1.0:lerr/1.0&foo/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&setenv/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&sticky:foo/1.0&auto-loaded
+
+# dependent module to unload is sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_urequn_sticky
+
+set ts_unload_switch_urequn_sticky [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_unload_switch_urequn_sticky \n\n[msg_top_unload {lerr/1.0} {} {foo/1.0} {} [err_urequn err/1.0]]
+testouterr_cmd bash {unload lerr/1.0} $ans_modfile_unload_urequn_sticky $ts_unload_switch_urequn_sticky
+
+set ts_unload_switch_urequn_sticky_force [msg_unload {err/1.0 <aL:S>} $err_stickyunloadf]
+append ts_unload_switch_urequn_sticky_force \n\n[msg_top_unload {lerr/1.0} {} {foo/1.0 err/1.0} {}]
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_urequn_sticky_force $ts_unload_switch_urequn_sticky_force
+
+# dependent module to unload is super-sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_urequn_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&super-sticky:foo/1.0&auto-loaded
+
+set ts_unload_switch_urequn_super_sticky_force [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_unload_switch_urequn_super_sticky_force \n\n[msg_top_unload {lerr/1.0} {} {foo/1.0} {} [err_urequn err/1.0]]
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_urequn_super_sticky $ts_unload_switch_urequn_super_sticky_force
+
+
+# dependent module to unload is sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_urequn_sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&sticky:foo/1.0&auto-loaded
+
+testouterr_cmd bash {unload lerr/1.0} $ans_modfile_unload_urequn_sticky $ts_unload_switch_urequn_sticky
+
+set ts_unload_switch_urequn_sticky_noauto [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_unload_switch_urequn_sticky_noauto \n\n[msg_unload {foo/1.0 <aL>} [err_urequn err/1.0]]
+append ts_unload_switch_urequn_sticky_noauto \n\n[msg_top_unload {lerr/1.0} {} {foo/1.0} {}]
+testouterr_cmd bash {unload --no-auto lerr/1.0} $ans_modfile_unload_urequn_sticky_noauto $ts_unload_switch_urequn_sticky_noauto
+
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_urequn_sticky_force $ts_unload_switch_urequn_sticky_force
+
+testouterr_cmd bash {unload --no-auto --force lerr/1.0} $ans_modfile_unload_urequn_sticky_force $ts_unload_switch_urequn_sticky_force
+
+
+# dependent module to unload is super-sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_urequn_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&super-sticky:foo/1.0&auto-loaded
+
+testouterr_cmd bash {unload --force lerr/1.0} $ans_modfile_unload_urequn_super_sticky $ts_unload_switch_urequn_super_sticky_force
+
+set ts_unload_switch_urequn_super_sticky_force_noauto [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_unload_switch_urequn_super_sticky_force_noauto \n\n[msg_unload {foo/1.0 <aL>} [err_urequn err/1.0]]
+append ts_unload_switch_urequn_super_sticky_force_noauto \n\n[msg_top_unload {lerr/1.0} {} {foo/1.0} {}]
+testouterr_cmd bash {unload --no-auto --force lerr/1.0} $ans_modfile_unload_urequn_super_sticky_noauto_force $ts_unload_switch_urequn_super_sticky_force_noauto
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# module switch in modulefile, not top modulefile, continue behavior (no change on modulefile cmd)
+#
+
+setenv_var MODULES_ABORT_ON_ERROR ml:reload
+
+set ts_add_llerr_reqlo_err \n\n[msg_load llerr/1.0 [err_reqlo lerr/1.0]]
+
+# bad code on unloading module
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_unload_bad
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_unload_bad$ts_add_llerr_reqlo_err
+set ts_sub_unload_bad_force [msg_unload err/1.0 [msg_modwarn {invalid command name "bad"} bad $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_sub_unload_bad_force \n\n[msg_top_load llerr/1.0 err/1.0 {foo/1.0 lerr/1.0} {}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_unload_bad $ts_sub_unload_bad_force
+
+
+# error on unloading and loading modules
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_both_error
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_both_error$ts_add_llerr_reqlo_err
+set ts_sub_both_error_force [msg_unload err/1.0 [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_sub_both_error_force \n\n[msg_load err/1.1 [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_sub_both_error_force \n\n[msg_load {lerr/1.0 <aL>} [err_reqlof err/1.1]]
+append ts_sub_both_error_force \n\n[msg_top_load llerr/1.0 err/1.0 {lerr/1.0} {}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_both_error $ts_sub_both_error_force
+
+
+# dependent reload module breaks on unload and load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_depre_break$ts_add_llerr_reqlo_err
+set ts_sub_depre_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_sub_depre_break_force \n\n[msg_load err/1.0 $err_evalabort]
+append ts_sub_depre_break_force \n\n[msg_load {lerr/1.0 <aL>} [err_depref err/1.0]]
+append ts_sub_depre_break_force \n\n[msg_top_load llerr/1.0 foo/1.0 {setenv/1.0 lerr/1.0} {err/1.0 {}}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_depre_break $ts_sub_depre_break_force
+
+
+# dependent unload module breaks on unload
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_depun_break$ts_add_llerr_reqlo_err
+testouterr_cmd bash {load --no-auto llerr/1.0} ERR $ts_depun_break_noauto$ts_add_llerr_reqlo_err
+set ts_sub_depun_break_force [msg_unload err/1.0 $warn_evalabort]
+append ts_sub_depun_break_force \n\n[msg_load err/1.0 [err_reqmisf foo]]
+append ts_sub_depun_break_force \n\n[msg_top_load llerr/1.0 foo/1.0 {setenv/1.0 lerr/1.0} err/1.0]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_depun_break $ts_sub_depun_break_force
+
+
+# dependent reload module breaks on load
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depre_load_break
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&err/1.0|foo
+
+set ts_sub_depre_load_break [msg_load err/1.0 $err_evalabort]
+append ts_sub_depre_load_break \n\n[msg_load {lerr/1.0 <aL>} [err_depref err/1.0]]
+append ts_sub_depre_load_break \n\n[msg_top_load llerr/1.0 {foo/1.0} {setenv/1.0 lerr/1.0} {{err/1.0} {}}]
+testouterr_cmd bash {load llerr/1.0} $ans_sub_mfile_depre_break $ts_sub_depre_load_break
+set ts_sub_depre_load_break_force [msg_load err/1.0 $err_evalabort]
+append ts_sub_depre_load_break_force \n\n[msg_load {lerr/1.0 <aL>} [err_depref err/1.0]]
+append ts_sub_depre_load_break_force \n\n[msg_top_load llerr/1.0 foo/1.0 {setenv/1.0 lerr/1.0} {err/1.0 {}}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_depre_break $ts_sub_depre_load_break_force
+
+
+# loading module forbidden
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_forbidden
+setenv_loaded_module [list foo/1.0] [list $mp/foo/1.0]
+unsetenv_var __MODULES_LMPREREQ
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_load_forbidden$ts_add_llerr_reqlo_err
+set ts_sub_load_forbidden_force [msg_load {lerr/1.0 <aL>} [err_accessdenied err/1.0] [err_reqlof err/1.0]]
+append ts_sub_load_forbidden_force \n\n[msg_top_load llerr/1.0 foo/1.0 {lerr/1.0} {}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_load_forbidden $ts_sub_load_forbidden_force
+
+
+# unloading module is sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_unload_sticky$ts_add_llerr_reqlo_err
+set ts_sub_unload_sticky_force [msg_unload {err/1.0 <S>} $err_stickyunloadf]
+append ts_sub_unload_sticky_force \n\n[msg_top_load llerr/1.0 err/1.0 {foo/1.0 lerr/1.0} {}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_unload_sticky $ts_sub_unload_sticky_force
+
+
+# unloading module is super-sticky
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_super-sticky
+setenv_loaded_module [list err/1.0] [list $mp/err/1.0]
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+testouterr_cmd bash {load llerr/1.0} ERR $ts_unload_super_sticky$ts_add_llerr_reqlo_err
+set ts_sub_unload_super_sticky_force [msg_unload {err/1.0 <sS>} $err_superstickyunload]
+append ts_sub_unload_super_sticky_force \n\n[msg_load {lerr/1.0 <aL>} [err_conunf err/1.0]]
+append ts_sub_unload_super_sticky_force \n\n[msg_top_load llerr/1.0 {} {foo/1.0 lerr/1.0} {}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_unload_super_sticky $ts_sub_unload_super_sticky_force
+
+
+# unloading module not loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_not_loaded
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMTAG
+
+set ts_sub_unload_not_loaded [msg_top_load llerr/1.0 {} {foo/1.0 lerr/1.0} {}]
+testouterr_cmd bash {load llerr/1.0} $ans_sub_mfile_unload_not_loaded $ts_sub_unload_not_loaded
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_unload_not_loaded $ts_sub_unload_not_loaded
+
+
+# loading module already loaded
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_already_loaded
+setenv_loaded_module [list err/1.0 foo/1.0] [list $mp/err/1.0 $mp/foo/1.0]
+
+set ts_sub_load_already_loaded [msg_top_load llerr/1.0 err/1.0 {lerr/1.0} {}]
+testouterr_cmd bash {load llerr/1.0} $ans_sub_mfile_load_already_loaded $ts_sub_load_already_loaded
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_mfile_load_already_loaded $ts_sub_load_already_loaded
+
+
+# error during unload of switch-on module when unloading modulefile that "module switch"
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_error
+setenv_loaded_module [list err/1.0 lerr/1.0 llerr/1.0] [list $mp/err/1.0 $mp/lerr/1.0 $mp/llerr/1.0]
+setenv_var __MODULES_LMPREREQ lerr/1.0&err/1.0:llerr/1.0&lerr/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&foo/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded:lerr/1.0&auto-loaded
+
+set ts_sub_unload_mfile_error [msg_unload {err/1.0 <aL>} [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_sub_unload_mfile_error \n\n[msg_top_unload llerr/1.0 {} {lerr/1.0} {} [err_urequn err/1.0]]
+testouterr_cmd bash {unload llerr/1.0} $ans_unload_sub_mfile_error $ts_sub_unload_mfile_error
+
+set ts_sub_unload_mfile_error_noauto [msg_unload {err/1.0 <aL>} [msg_moderr msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_sub_unload_mfile_error_noauto \n\n[msg_unload {lerr/1.0 <aL>} [err_urequn err/1.0]]
+append ts_sub_unload_mfile_error_noauto \n\n[msg_top_unload llerr/1.0 {} {lerr/1.0} {}]
+testouterr_cmd bash {unload --no-auto llerr/1.0} $ans_unload_sub_mfile_error_noauto $ts_sub_unload_mfile_error_noauto
+
+set ts_sub_unload_mfile_error_force [msg_unload {err/1.0 <aL>} [msg_modwarn msg {error msg} $mp/err/1.0 2 {} {} {} $custom_error_trace]]
+append ts_sub_unload_mfile_error_force \n\n[msg_top_unload llerr/1.0 {} {lerr/1.0 err/1.0} {}]
+testouterr_cmd bash {unload --force llerr/1.0} $ans_unload_mfile_error_force $ts_sub_unload_mfile_error_force
+testouterr_cmd bash {unload --no-auto --force llerr/1.0} $ans_unload_mfile_error_force $ts_sub_unload_mfile_error_force
+
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# dependent unload mechanism with sticky modules when loading modulefile doing module switch (not top modulefile)
+#
+
+setenv_loaded_module [list foo/1.0 err/1.0] [list $mp/foo/1.0 $mp/err/1.0]
+setenv_var __MODULES_LMPREREQ err/1.0&foo
+setenv_var __MODULES_LMTAG err/1.0&sticky
+
+# dependent module to unload is sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_sticky
+
+set ts_switch_depun_sticky [msg_load {err/1.0} [err_reqmis foo]]
+append ts_switch_depun_sticky \n\n[msg_load {lerr/1.0 <aL>} [err_depref err/1.0]]
+append ts_switch_depun_sticky \n\n[msg_top_load {llerr/1.0} {foo/1.0} {setenv/1.0 lerr/1.0} {{err/1.0} {}}]
+testouterr_cmd bash {load llerr/1.0} $ans_sub_modfile_depun_sticky $ts_switch_depun_sticky
+
+set ts_switch_depun_sticky_force [msg_load {err/1.0 <S>} [err_reqmisf foo]]
+append ts_switch_depun_sticky_force \n\n[msg_top_load {llerr/1.0} {foo/1.0} {setenv/1.0 lerr/1.0} {err/1.0}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_modfile_depun_sticky_force $ts_switch_depun_sticky_force
+
+# dependent module to unload is super-sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_depun_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&super-sticky
+
+set ts_switch_depun_super_sticky_force [msg_load {err/1.0 <sS>} [err_reqmisf foo]]
+append ts_switch_depun_super_sticky_force \n\n[msg_top_load {llerr/1.0} {foo/1.0} {setenv/1.0 lerr/1.0} {err/1.0}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_modfile_depun_super_sticky_force $ts_switch_depun_super_sticky_force
+
+
+#
+# dependent unload mechanism with sticky modules when unloading modulefile doing module switch (not top modulefile)
+#
+
+setenv_loaded_module [list foo/1.0 lerr/1.0 err/1.0 llerr/1.0] [list $mp/foo/1.0 $mp/lerr/1.0 $mp/err/1.0 $mp/llerr/1.0]
+setenv_var __MODULES_LMPREREQ lerr/1.0&foo/1.0:err/1.0&foo:llerr/1.0&lerr/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&setenv/1.0
+setenv_var __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&sticky:lerr/1.0&auto-loaded
+
+# dependent module to unload is sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_depun_sticky
+
+set ts_sub_unload_switch_depun_sticky [msg_top_unload llerr/1.0 {} {lerr/1.0} {}]
+testouterr_cmd bash {unload llerr/1.0} $ans_sub_modfile_unload_depun_sticky $ts_sub_unload_switch_depun_sticky
+
+testouterr_cmd bash {unload --no-auto llerr/1.0} $ans_sub_modfile_unload_depun_sticky $ts_sub_unload_switch_depun_sticky
+
+testouterr_cmd bash {unload --force llerr/1.0} $ans_sub_modfile_unload_depun_sticky $ts_sub_unload_switch_depun_sticky
+
+testouterr_cmd bash {unload --no-auto --force llerr/1.0} $ans_sub_modfile_unload_depun_sticky $ts_sub_unload_switch_depun_sticky
+
+
+# dependent module to unload is super-sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_depun_super-sticky
+setenv_var __MODULES_LMTAG foo/1.0&auto-loaded:err/1.0&super-sticky:lerr/1.0&auto-loaded
+
+testouterr_cmd bash {unload --force llerr/1.0} $ans_sub_modfile_unload_depun_super_sticky $ts_sub_unload_switch_depun_sticky
+
+testouterr_cmd bash {unload --no-auto --force llerr/1.0} $ans_sub_modfile_unload_depun_super_sticky $ts_sub_unload_switch_depun_sticky
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+# useless requirement unload mechanism with sticky modules when loading modulefile doing module switch (not top modulefile)
+#
+
+setenv_loaded_module [list err/1.0 foo/1.0] [list $mp/err/1.0 $mp/foo/1.0]
+setenv_var __MODULES_LMPREREQ foo/1.0&err/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&sticky
+
+# dependent module to unload is sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_urequn_sticky
+
+set ts_sub_switch_urequn_sticky [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_sub_switch_urequn_sticky \n\n[msg_unload {foo/1.0} [err_urequn err/1.0]]
+append ts_sub_switch_urequn_sticky \n\n[msg_top_load {llerr/1.0} {foo/1.0} {setenv/1.0 lerr/1.0} {}]
+testouterr_cmd bash {load llerr/1.0} $ans_sub_modfile_urequn_sticky $ts_sub_switch_urequn_sticky
+
+set ts_sub_switch_urequn_sticky_force [msg_unload {err/1.0 <aL:S>} $err_stickyunloadf]
+append ts_sub_switch_urequn_sticky_force \n\n[msg_top_load {llerr/1.0} {} {setenv/1.0 lerr/1.0} {} {Unloading conflict: foo/1.0} {Unloading useless requirement: err/1.0}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_modfile_urequn_sticky_force $ts_sub_switch_urequn_sticky_force
+
+# dependent module to unload is super-sticky, dependency declared with prereq
+setenv_var TESTSUITE_ABORT_ON_ERROR switch_urequn_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&super-sticky
+
+set ts_sub_switch_urequn_super_sticky_force [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_sub_switch_urequn_super_sticky_force \n\n[msg_unload {foo/1.0} [err_urequn err/1.0]]
+append ts_sub_switch_urequn_super_sticky_force \n\n[msg_top_load {llerr/1.0} {foo/1.0} {setenv/1.0 lerr/1.0} {}]
+testouterr_cmd bash {load --force llerr/1.0} $ans_sub_modfile_urequn_super_sticky_force $ts_sub_switch_urequn_super_sticky_force
+
+
+#
+# useless requirement unload mechanism with sticky modules when unloading modulefile doing module switch (not top modulefile)
+#
+
+setenv_loaded_module [list err/1.0 foo/1.0 lerr/1.0 llerr/1.0] [list $mp/err/1.0 $mp/foo/1.0 $mp/lerr/1.0 $mp/llerr/1.0]
+setenv_var __MODULES_LMPREREQ foo/1.0&err/1.0:lerr/1.0&foo/1.0:llerr/1.0&lerr/1.0
+setenv_var __MODULES_LMCONFLICT lerr/1.0&setenv/1.0
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&sticky:foo/1.0&auto-loaded:lerr/1.0&auto-loaded
+
+# dependent module to unload is sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_urequn_sticky
+
+set ts_sub_unload_switch_urequn_sticky [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_sub_unload_switch_urequn_sticky \n\n[msg_top_unload {llerr/1.0} {} {lerr/1.0 foo/1.0} {} [err_urequn err/1.0]]
+testouterr_cmd bash {unload llerr/1.0} $ans_modfile_unload_urequn_sticky $ts_sub_unload_switch_urequn_sticky
+
+set ts_sub_unload_switch_urequn_sticky_noauto [msg_unload {err/1.0 <aL:S>} $err_stickyunload]
+append ts_sub_unload_switch_urequn_sticky_noauto \n\n[msg_unload {foo/1.0 <aL>} [err_urequn err/1.0]]
+append ts_sub_unload_switch_urequn_sticky_noauto \n\n[msg_top_unload {llerr/1.0} {} {lerr/1.0 foo/1.0} {}]
+testouterr_cmd bash {unload --no-auto llerr/1.0} $ans_modfile_unload_urequn_sticky_noauto $ts_sub_unload_switch_urequn_sticky_noauto
+
+set ts_sub_unload_switch_urequn_sticky_force [msg_unload {err/1.0 <aL:S>} $err_stickyunloadf]
+append ts_sub_unload_switch_urequn_sticky_force \n\n[msg_top_unload {llerr/1.0} {} {lerr/1.0 foo/1.0 err/1.0} {}]
+testouterr_cmd bash {unload --force llerr/1.0} $ans_modfile_unload_urequn_sticky_force $ts_sub_unload_switch_urequn_sticky_force
+
+testouterr_cmd bash {unload --no-auto --force llerr/1.0} $ans_modfile_unload_urequn_sticky_force $ts_sub_unload_switch_urequn_sticky_force
+
+
+# dependent module to unload is super-sticky, dependency declared with module load
+setenv_var TESTSUITE_ABORT_ON_ERROR unload_switch_load_urequn_super-sticky
+setenv_var __MODULES_LMTAG err/1.0&auto-loaded&super-sticky:foo/1.0&auto-loaded:lerr/1.0&auto-loaded
+
+set ts_sub_unload_switch_urequn_super_sticky_force [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_sub_unload_switch_urequn_super_sticky_force \n\n[msg_top_unload {llerr/1.0} {} {lerr/1.0 foo/1.0} {} [err_urequn err/1.0]]
+testouterr_cmd bash {unload --force llerr/1.0} $ans_modfile_unload_urequn_super_sticky $ts_sub_unload_switch_urequn_super_sticky_force
+
+set ts_sub_unload_switch_urequn_super_sticky_force_noauto [msg_unload {err/1.0 <aL:sS>} $err_superstickyunload]
+append ts_sub_unload_switch_urequn_super_sticky_force_noauto \n\n[msg_unload {foo/1.0 <aL>} [err_urequn err/1.0]]
+append ts_sub_unload_switch_urequn_super_sticky_force_noauto \n\n[msg_top_unload {llerr/1.0} {} {lerr/1.0 foo/1.0} {}]
+testouterr_cmd bash {unload --no-auto --force llerr/1.0} $ans_modfile_unload_urequn_super_sticky_noauto_force $ts_sub_unload_switch_urequn_super_sticky_force_noauto
+
+unsetenv_loaded_module
+unsetenv_var __MODULES_LMPREREQ
+unsetenv_var __MODULES_LMCONFLICT
+unsetenv_var __MODULES_LMTAG
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

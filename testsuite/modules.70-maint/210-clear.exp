@@ -1,0 +1,116 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	2019/01/13
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:        clear
+#   Modulefiles:
+#   Sub-Command:
+#
+#   Comment:	%C{
+#           Test of the 'clear' command
+#		}C%
+#
+##############################################################################
+
+set mp "$modpath.2"
+
+# setup specific environment
+setenv_path_var MODULEPATH $mp
+
+# no module loaded
+# no Modules-specific env variables, nothing cleared
+testouterr_cmd sh {clear y} OK {}
+
+# basic module loaded
+setenv_loaded_module [list clear/3] [list $mp/clear/3]
+set ans [list]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+testouterr_cmd sh {clear y} $ans {}
+
+skip_if_quick_mode
+
+# test all valid confirmation strings
+foreach str [list y Y yes YES Yes yESfoo] {
+    testouterr_cmd sh "clear $str" $ans {}
+}
+
+# test valid confirmation passed via stdin
+foreach str [list y Y yes YES Yes yESfoo] {
+    testinouterr_cmd sh {clear} $str $ans {}
+}
+
+# advanced module-set loaded
+setenv_loaded_module [list clear/1 clear/2] [list $mp/clear/1 $mp/clear/2] [list clear/1]
+setenv_var __MODULES_LMALTNAME clear/1&clear/foo
+setenv_var __MODULES_LMPREREQ clear/2&clear/1
+setenv_var __MODULES_LMCONFLICT clear/2&clear/3
+setenv_var __MODULES_LMSOURCESH "clear/2&bash testsuite/example/sh-to-mod.sh arg1:arg2|prepend-path FOOPATH /path/to/dir1"
+setenv_var __MODULES_LMEXTRATAG clear/2&foo
+setenv_var __MODULES_LMTAG clear/1&auto-loaded:clear/2&nearly-forbidden&foo
+setenv_var __MODULES_LMVARIANT clear/2&foo|val1|0|0
+setenv_var __MODULES_LMINIT "module use --append $mp:module load --tag=auto-loaded clear/1"
+setenv_var __MODULES_LMREFRESH clear/1
+setenv_path_var FOO bar
+
+set ans [list]
+# different result output order is expected on MSYS platform
+if {[regexp {^MSYS_NT.*} $tcl_platform(os)]} {
+    lappend ans [list unset __MODULES_LMVARIANT]
+    lappend ans [list unset __MODULES_LMALTNAME]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list unset __MODULES_LMREFRESH]
+    lappend ans [list unset _LMFILES_]
+    lappend ans [list unset LOADEDMODULES]
+    lappend ans [list unset __MODULES_LMTAG]
+    lappend ans [list unset __MODULES_LMEXTRATAG]
+    lappend ans [list unset __MODULES_LMSOURCESH]
+    lappend ans [list unset __MODULES_LMINIT]
+} else {
+    lappend ans [list unset __MODULES_LMVARIANT]
+    lappend ans [list unset __MODULES_LMCONFLICT]
+    lappend ans [list unset __MODULES_LMALTNAME]
+    lappend ans [list unset __MODULES_LMPREREQ]
+    lappend ans [list unset __MODULES_LMREFRESH]
+    lappend ans [list unset _LMFILES_]
+    lappend ans [list unset LOADEDMODULES]
+    lappend ans [list unset __MODULES_LMEXTRATAG]
+    lappend ans [list unset __MODULES_LMSOURCESH]
+    lappend ans [list unset __MODULES_LMINIT]
+    lappend ans [list unset __MODULES_LMTAG]
+}
+
+testouterr_cmd sh {clear YES} $ans {}
+
+# test cancellation strings
+# no empty arg test not to make testsuite execution wait on an input
+foreach str [list no NO n N {} foo] {
+    testouterr_cmd sh "clear $str" {} "$info_msgs: Modules runtime information were not cleared"
+}
+
+# test cancelled confirmation passed via stdin
+foreach str [list no NO n N {} foo] {
+    testinouterr_cmd sh {clear} $str {} "$info_msgs: Modules runtime information were not cleared"
+}
+
+# skip confirmation with --force command-line switch
+testouterr_cmd sh {clear -f} $ans {}
+testouterr_cmd sh {clear --force} $ans {}
+testouterr_cmd sh {clear -f yes} $ans {}
+testouterr_cmd sh {clear -f no} $ans {}
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

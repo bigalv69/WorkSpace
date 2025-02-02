@@ -1,0 +1,276 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:       modules.00-init/%M%
+#   Revision:       %I%
+#   First Edition:  2017/05/07
+#   Last Mod.:      %U%, %G%
+#
+#   Authors:        Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:    Testuite testsequence
+#   Command:
+#   Sub-Command:
+#
+#   Comment:    %C{
+#           Check selected installation options have been honored
+#       }C%
+#
+##############################################################################
+
+
+set bad_cmd "$error_msgs: Invalid command 'foo'"
+set use_desc "Search path for module files \\(in search order\\):"
+set moddir_header "$install_modulefilesdirre:"
+set versdir_header "$install_versionfilesdirre:"
+foreach mod [list dot module-git module-info modules null use.own] {
+   if {[info exists mod_examples]} {
+      append mod_examples "\n"
+   }
+   append mod_examples $mod
+   if {[lsearch -exact [split $install_loadedmodulesre :] $mod] != -1} {
+      append mod_examples { <L>}
+   }
+}
+set lm_list [split $install_loadedmodulesre ":"]
+
+# check if modulefiles dir is part of default MODULEPATH
+set modfilesdir_in_modpath 0
+foreach modp [split $install_modulepath ":"] {
+   # adapt modulepath entry if it contains variable reference
+   regsub -all {\$[{]?[A-Za-z_][A-Za-z0-9_]*[}]?} $modp {.*} modp
+   if {[regexp "^$modp\$" $install_modulefilesdir]} {
+      set modfilesdir_in_modpath 1
+      break
+   }
+}
+
+# adapt modulepath entry if it contains variable reference
+set modpath_listre [list]
+foreach modp [split $install_modulepathre ":"] {
+   regsub -all {\$[{]?[A-Za-z_][A-Za-z0-9_]*[}]?} $modp {.*} modp
+   lappend modpath_listre $modp
+}
+
+#
+# The tests
+#
+
+if {$install_setmanpath eq "y" && $install_builddoc ne "n"} {
+   if {$verbose} {
+      send_user "\tChecking man pages availability\n"
+   }
+   unsetenv_var MANPATH
+   foreach shell $shell_list {
+      # ask for all man page locations to ensure finding ours rather others installed on the system
+      testall_cmd_re "$shell" "man -a -w modulefile" ".*$install_mandirre/man5/modulefile.*" {} 0
+      testall_cmd_re "$shell" "man -a -w module" ".*$install_mandirre/man1/module.*" {} 0
+   }
+} elseif {$verbose} {
+   send_user "\tSkipping man pages availability checks\n"
+}
+
+if {$install_setbinpath eq "y"} {
+   if {$verbose} {
+      send_user "\tChecking envml availability\n"
+   }
+   foreach shell $shell_list {
+      testall_cmd_re "$shell" "envml -h" "Usage:.*/envml .*" {} 0
+   }
+   if {$install_examplemodulefiles eq "y" && $install_loadedmodules eq "" \
+      && $modfilesdir_in_modpath} {
+      foreach shell $shell_list {
+         if {$shell eq {bash} || $shell eq {basheu} || [is_set_shell_startup_enabled] || ($shell eq {sh} && $sh_kind eq {bash})} {
+            testall_cmd "$shell" "envml null printenv LOADEDMODULES" "null" "" 0
+         } else {
+            testall_cmd "$shell" "envml null printenv LOADEDMODULES" "" "envml: module command not found..." 1
+         }
+      }
+   }
+
+   if {$verbose} {
+      send_user "\tChecking modulecmd availability\n"
+   }
+   foreach shell $shell_list {
+      if {$shell eq "basheu"} {
+         testall_cmd_re "$shell" "modulecmd bash --version" {} "Modules Release \\S+ (\\S+)" 0
+      } else {
+         testall_cmd_re "$shell" "modulecmd $shell --version" {} "Modules Release \\S+ (\\S+)" 0
+      }
+   }
+
+   if {$verbose} {
+      send_user "\tChecking other utilities availability\n"
+   }
+   foreach shell $shell_list {
+      switch -- $shell {
+         csh - tcsh {
+            testall_cmd "$shell" "which add.modules" "$install_bindir/add.modules" "" 0
+            testall_cmd "$shell" "which mkroot" "$install_bindir/mkroot" "" 0
+         }
+         ksh {
+            if {[string first { } $install_bindir] != -1} {
+               testall_cmd $shell {command -v add.modules} "'$install_bindir/add.modules'" {} 0
+               testall_cmd $shell {command -v mkroot} "'$install_bindir/mkroot'" {} 0
+            } else {
+               testall_cmd $shell {command -v add.modules} $install_bindir/add.modules {} 0
+               testall_cmd $shell {command -v mkroot} $install_bindir/mkroot {} 0
+            }
+         }
+         default {
+            testall_cmd "$shell" "command -v add.modules" "$install_bindir/add.modules" "" 0
+            testall_cmd "$shell" "command -v mkroot" "$install_bindir/mkroot" "" 0
+         }
+      }
+   }
+} elseif {$verbose} {
+   send_user "\tSkipping envml availability checks\n"
+   send_user "\tSkipping modulecmd availability checks\n"
+   send_user "\tSkipping other utilities availability checks\n"
+}
+
+if {$install_modulepath ne ""} {
+   if {$verbose} {
+      send_user "\tChecking default modulepath setup\n"
+   }
+   foreach shell $shell_list {
+      testall_cmd_re "$shell" "module use" {} "$use_desc\n\\s+[join $modpath_listre {\n\\s+}]" 0
+   }
+   foreach shell $othlang_list {
+      testall_cmd_re "$shell" "use" {} "$use_desc\n\\s+[join $modpath_listre {\n\\s+}]" 0
+   }
+} elseif {$verbose} {
+   send_user "\tSkipping default modulepath checks\n"
+}
+
+if {$install_examplemodulefiles eq "y" && $modfilesdir_in_modpath} {
+   if {$verbose} {
+      send_user "\tChecking example modulefiles installation\n"
+   }
+   set env(MODULES_TAG_ABBREV) {loaded=L}
+   foreach shell $shell_list {
+      testall_cmd_re "$shell" "module avail -t" {} "$moddir_header\n$mod_examples" 0
+   }
+   foreach shell $othlang_list {
+      testall_cmd_re "$shell" "avail,-t" {} "$moddir_header\n$mod_examples" 0
+   }
+   unset env(MODULES_TAG_ABBREV)
+   # check version-specific modulefile, related to versioning installation mode
+   if {$install_versioning eq "y"} {
+      # disable advanced version spec to correctly resolve version module
+      # when module version contains a branch name and '+' sign
+      setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+      foreach shell $shell_list {
+         testall_cmd_re "$shell" "module load modules; module avail -t $install_version" {} "$versdir_header\n$install_versionre" 0
+      }
+      foreach shell $othlang_list {
+         testall_cmd_re "$shell" "load,modules:avail,-t,$install_version" {} "$versdir_header\n$install_versionre" 0
+      }
+      unsetenv_var MODULES_ADVANCED_VERSION_SPEC
+   }
+} elseif {$verbose} {
+   send_user "\tSkipping example modulefiles installation checks\n"
+}
+
+if {$install_loadedmodules ne ""} {
+   if {$verbose} {
+      send_user "\tChecking default loaded modules setup\n"
+   }
+   foreach shell $shell_list {
+      testall_cmd_re "$shell" "module list -t" {} "$cur_loaded\n[join $lm_list {.*\n}]" 0
+   }
+   foreach shell $othlang_list {
+      testall_cmd_re "$shell" "list,-t" {} "$cur_loaded\n[join $lm_list {.*\n}]" 0
+   }
+} elseif {$verbose} {
+   send_user "\tSkipping default loaded modules checks\n"
+}
+
+# basic test for MODULES_SILENT_SHELL_DEBUG, checking module answer is still present
+# among the debugging output
+if {$install_silentshdbgsupport eq y} {
+if {$verbose} {
+   send_user "\tChecking MODULES_SILENT_SHELL_DEBUG\n"
+   send_user "\tSetup MODULES_SILENT_SHELL_DEBUG = '1'\n"
+}
+set env(MODULES_SILENT_SHELL_DEBUG) 1
+
+set no_loadedmodules_inject 1
+foreach shell $shell_sh_family {
+   if {[info exists shell_opts($shell)]} {
+      set shell_opts_save $shell_opts($shell)
+      set shell_opts($shell) "$shell_opts($shell)xv"
+   } else {
+      set shell_opts($shell) "-xv"
+   }
+   testall_cmd_re "$shell" "module --version" {} ".*Modules Release \\S+ (\\S+).*" 0
+   if {[info exists shell_opts_save]} {
+      set shell_opts($shell) $shell_opts_save
+      unset shell_opts_save
+   } else {
+      unset shell_opts($shell)
+   }
+}
+unset no_loadedmodules_inject
+
+if {$verbose} {
+   send_user "\tSetup MODULES_SILENT_SHELL_DEBUG = '0'\n"
+}
+set env(MODULES_SILENT_SHELL_DEBUG) 0
+
+set no_loadedmodules_inject 1
+foreach shell $shell_sh_family {
+   if {[info exists shell_opts($shell)]} {
+      set shell_opts_save $shell_opts($shell)
+      set shell_opts($shell) "$shell_opts($shell)xv"
+   } else {
+      set shell_opts($shell) "-xv"
+   }
+   testall_cmd_re "$shell" "module --version" {} ".*Modules Release \\S+ (\\S+).*" 0
+   if {[info exists shell_opts_save]} {
+      set shell_opts($shell) $shell_opts_save
+      unset shell_opts_save
+   } else {
+      unset shell_opts($shell)
+   }
+}
+unset no_loadedmodules_inject
+
+unset env(MODULES_SILENT_SHELL_DEBUG)
+} elseif {$verbose} {
+   send_user "\tSkipping silent shell debug checks\n"
+}
+
+# test Windows-specific install
+if {$verbose} {
+   send_user "\tChecking Windows-specific files availability\n"
+}
+testall_cmd_re "sh" "test -e '$install_initdir/cmd.cmd'" "" "" [expr {$install_windowssupport ne {y}}]
+testall_cmd_re "sh" "test -e '$install_bindir/module.cmd'" "" "" [expr {$install_windowssupport ne {y}}]
+testall_cmd_re "sh" "test -e '$install_bindir/ml.cmd'" "" "" [expr {$install_windowssupport ne {y}}]
+testall_cmd_re "sh" "test -e '$install_bindir/envml.cmd'" "" "" [expr {$install_windowssupport ne {y}}]
+
+# test Nagelfar lint capabilities
+set nafelgar_script [glob -nocomplain nagelfar*/nagelfar.tcl]
+if {[string length $nafelgar_script]} {
+   if {$verbose} {
+      send_user "\tChecking Nagelfar linting\n"
+   }
+   set tserr "Linting $testsuite_modpath/prepend/1.6\n"
+   append tserr "  $error_msgs   line 24: Wrong number of arguments (3) to \"prepend-path\""
+   testall_cmd sh "module config tcl_linter $nafelgar_script; module lint --redirect $testsuite_modpath/prepend/1.6" $tserr {} 1
+   set tserr "Linting $testsuite_modpath.3/lcompat/.version\n"
+   append tserr "  $warn_msgs line 6: Variable \"ModuleVersion\" should be renamed \"ModulesVersion\"\n"
+   append tserr "  $warn_msgs line 10: Variable \"ModuleVersion\" should be renamed \"ModulesVersion\"\n"
+   append tserr "  $warn_msgs line 13: Variable \"ModuleVersion\" should be renamed \"ModulesVersion\""
+   testall_cmd sh "module config tcl_linter $nafelgar_script; module lint --redirect $testsuite_modpath.3/lcompat/.version" $tserr {} 0
+}
+
+#
+#  Clean up variables used in this test case
+#
+
+reset_test_env
+
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

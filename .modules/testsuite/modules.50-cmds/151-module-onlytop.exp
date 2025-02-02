@@ -1,0 +1,78 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	2017/11/25
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:		load
+#   Modulefiles:    modbad
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests 'module' sub-commands that cannot be called
+#           outside of command line
+#		}C%
+#
+##############################################################################
+
+skip_if_quick_mode
+
+setenv_path_var MODULEPATH $modpath $modpath.3
+
+foreach subcmd [list append-path prepend-path remove-path autoinit help is-loaded is-saved is-used is-avail path paths info-loaded clear config sh-to-mod edit refresh state lint mod-to-sh reset stash stashclear stashlist stashpop stashrm stashshow cachebuild cacheclear] {
+    set module "modbad/$subcmd"
+    if {$subcmd in {refresh source state lint mod-to-sh reset stash stashclear stashlist stashpop stashrm stashshow cachebuild cacheclear}} {
+        set modulefile "$modpath.3/$module"
+        set modulefilere "$modpathre.3/$module"
+    } else {
+        set modulefile "$modpath/$module"
+        set modulefilere "$modpathre/$module"
+    }
+
+    switch -- $subcmd {
+        {append-path} - {prepend-path} - {remove-path} {
+            set subcmdargs " FOO bar"
+        }
+        {is-loaded} - {is-saved} - {is-used} - {is-avail} - {info-loaded} - {path} - {paths} {
+            set subcmdargs " bar"
+        }
+        default {
+            set subcmdargs ""
+        }
+    }
+    set moderr [msg_moderr "module: Command '$subcmd' not supported" "<EXM>module $subcmd$subcmdargs" $modulefile 27]
+    testouterr_cmd_re "sh" "load $module" "ERR" [escre [msg_load $module $moderr]]
+
+    # no subcommand check on display, so no error
+    testouterr_cmd_re "sh" "display $module" "OK" "$modlin\n$modulefilere:\n\nmodule\t\t$subcmd$subcmdargs\nmodule\t\thelp\n$modlin"
+}
+
+set module "modbad/foo"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+set moderr [msg_moderr {module: Invalid command 'foo'} {module foo} $modulefile 27]
+
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $moderr]
+testouterr_cmd_re "sh" "display $module" "OK" "$modlin\n$modulefilere:\n\nmodule\t\tfoo\nmodule\t\thelp\n$modlin"
+
+set module "modbad/empty"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+
+set moderr [msg_moderr {module: Command 'help' not supported} "module {}" $modulefile 27]
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $moderr]
+
+testouterr_cmd_re "sh" "display $module" "OK" "$modlin\n$modulefilere:\n\nmodule\t\t{}\nmodule\t\thelp\n$modlin"
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

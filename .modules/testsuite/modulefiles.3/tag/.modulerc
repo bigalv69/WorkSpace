@@ -1,0 +1,218 @@
+#%Module
+if {![info exists env(TESTSUITE_FPMOD_TAG)]} {
+    module-forbid tag/1.0 tag/2.0 tag/3.0
+    module-virtual tag/2.0 ./1.0
+    module-alias tag/3.0 tag/1.0
+}
+
+if {[versioncmp $tcl_version 8.5] > -1} {
+    set tomorrow [clock format [expr {[clock seconds]+86400}] -format %Y-%m-%d]
+    module-forbid --after $tomorrow tag/4.0
+}
+
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR1)]} {
+    module-tag
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR2)]} {
+    module-tag foo
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR3)]} {
+    module-tag --foo foo tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR4)]} {
+    module-tag --before 2020-11-01 foo tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR5)]} {
+    module-tag --after 2020-11-01 foo tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR6)]} {
+    module-tag loaded tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR7)]} {
+    module-tag auto-loaded tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR8)]} {
+    module-tag forbidden tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR9)]} {
+    module-tag nearly-forbidden tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR10)]} {
+    module-tag hidden tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_ERR11)]} {
+    module-tag hidden-loaded tag/5.0
+}
+
+if {[info exists env(TESTSUITE_MODULE_TAG_SET1)]} {
+    module-tag foo tag/5.0 tag/6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET2)]} {
+    module-tag foo tag@5.0 tag@6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET3)]} {
+    module-tag foo tag @5.0 tag @6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET4)]} {
+    module-tag foo tag @5.0 tag @6.0
+    module-tag BaR tag@5:6
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET5)]} {
+    module-tag --not-user [module-info username] foo tag/5.0 tag/6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET6)]} {
+    module-tag --not-user unkuser foo tag/5.0 tag/6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET7)]} {
+    module-tag --not-group [module-info usergroups] foo tag/5.0 tag/6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET8)]} {
+    module-tag --not-group unkgrp foo tag/5.0 tag/6.0
+}
+
+# for sgr tests in 70/322
+if {[info exists env(TESTSUITE_MODULE_TAG_SET9)]} {
+    module-tag foo tag/5.0 tag/3.0 tag/6.0
+    module-tag bar tag/5.0 tag/3.0 tag/6.0
+    module-version tag/3.0 default
+    module-hide tag/6.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET10)]} {
+    module-virtual tag/tagtag ./1.0
+    module-tag A tag/tagtag
+    module-tag B tag/tagtag
+    module-tag C tag/tagtag
+    module-tag D tag/tagtag
+    module-tag E tag/tagtag
+    module-tag F tag/tagtag
+    module-tag G tag/tagtag
+    module-tag H tag/tagtag
+    module-tag I tag/tagtag
+    module-tag J tag/tagtag
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET11)]} {
+    module-virtual tag/tagtag ./1.0
+    module-tag A tag/tagtag
+    module-tag B tag/tagtag
+    module-tag C tag/tagtag
+    module-tag D tag/tagtag
+    module-tag E tag/tagtag
+    module-tag F tag/tagtag
+    module-tag G tag/tagtag
+    module-tag H tag/tagtag
+    module-tag I tag/tagtag
+    module-tag J tag/tagtag
+    module-tag K tag/tagtag
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET12)]} {
+    module-virtual tag/tagtag ./1.0
+    module-tag A tag/tagtag
+    module-tag B tag/tagtag
+    module-tag C tag/tagtag
+    module-tag D tag/tagtag
+    module-tag E tag/tagtag
+    module-tag F tag/tagtag
+    module-tag G tag/tagtag
+    module-tag H tag/tagtag
+    module-tag I tag/tagtag
+    module-tag J tag/tagtag
+    module-tag LoO tag/tagtag
+    module-tag K tag/tagtag
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET13)]} {
+    module-hide --soft --hidden-loaded tag/5.0
+}
+if {[info exists env(TESTSUITE_MODULE_TAG_SET14)]} {
+    module-hide --hidden-loaded tag/5.0
+}
+if {[info exists env(TESTSUITE_TAG_OPT)]} {
+    switch -- $env(TESTSUITE_TAG_OPT) {
+        duprc1 - infotags2 {
+            module-tag foo tag/8.0
+        }
+        duprc2 {
+            module-tag foo tag/8.0
+            module-tag bar tag/8.0
+        }
+        loadtagdup2 {
+            module-tag bar foo/1.0
+        }
+        loadtagdup3 {
+            module-hide --hidden-loaded foo/1.0
+        }
+        colltag1 - colltag2 - colltag3 {
+            module-tag bar tag/8.0
+        }
+        colltag4 {
+            set tomorrow [clock format [expr {[clock seconds]+86400}] -format %Y-%m-%d]
+            module-forbid --after $tomorrow tag/8.0
+        }
+        vrdfl2 {
+            module-tag foo tag/8.0
+        }
+        vrdfl3 {
+            module-tag foo tag/8.0 foo=val1
+        }
+        vrdfl5 {
+            module-tag foo tag/8.0 foo=val1 bar=val2
+        }
+        vrdfl6 {
+            module-tag foo tag/8.0 foo=val1 bar=val1
+        }
+        vrdfl7 {
+            module-tag foo tag/8.0 foo=val1
+        }
+        vrdfl8 {
+            module-tag foo tag/8.0 bar=val1
+        }
+        vrdfl9 {
+            module-tag foo tag/8.0 bar=val2
+        }
+    }
+}
+if {[info exists env(TESTSUITE_STASH)]} {
+    switch -- $env(TESTSUITE_STASH) {
+        stash49 {
+            module-tag qux tag/8.0
+        }
+    }
+}
+
+# --user/--group tests in 50/440
+if {[info exists env(TESTSUITE_TAG_USER_GROUP)]} {
+    switch -- $env(TESTSUITE_TAG_USER_GROUP) {
+        user2 {
+            module-tag --user [list unknown1 [module-info username] unknown2] foo tag
+        }
+        user3 {
+            module-tag --user [list unknown1 unknown2] foo tag
+        }
+        user_notgroup3 {
+            module-tag --user [module-info username] --not-group [module-info usergroups] foo tag
+        }
+        user_notgroup4 {
+            module-tag --user unknown1 --not-group unknown1 foo tag
+        }
+        group2 {
+            module-tag --group [concat [list unknown1 unknown2] [module-info usergroups]] foo tag
+        }
+        group3 {
+            module-tag --group [list unknown1 unknown2] foo tag
+        }
+        group_notuser1 {
+            module-tag --group [module-info usergroups] --not-user unknown1 foo tag
+        }
+        group_notuser2 {
+            module-tag --group unknown1 --not-user [module-info username] foo tag
+        }
+        group_user1 {
+            module-tag --group [module-info usergroups] --user unknown1 foo tag
+        }
+        group_user2 {
+            module-tag --group unknown1 --user [module-info username] foo tag
+        }
+        group_user_notuser_notgroup2 {
+            module-tag --group unknown1 --user unknown1 foo tag --not-user unknown1 --not-group unknown1 hide1
+        }
+    }
+}

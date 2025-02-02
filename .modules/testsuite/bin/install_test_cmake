@@ -1,0 +1,117 @@
+#
+# INSTALL_TEST_CMAKE, cmake test script for install non-reg suite
+# Copyright (C) 2017-2021 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+cmake_policy(SET CMP0007 NEW)
+
+if(NOT EXISTS ${initfile})
+   message(FATAL_ERROR "Cannot read ${initfile}")
+endif()
+
+# source module init file
+include(${initfile})
+
+# execute command list
+set(code 0)
+set(runml 0)
+string(REPLACE ":" ";" cmdsplit "${cmdlist}")
+# empty command list, means one empty command
+list (LENGTH cmdlist cmdcnt)
+if(${cmdcnt} EQUAL 0)
+   module("")
+else()
+   foreach(cmd ${cmdsplit})
+      # call ml procedure instead of module
+      if("${cmd}" STREQUAL "ml")
+         set(runml 1)
+      # if command equals to NOARG string, means call with no arg passed
+      elseif("${cmd}" STREQUAL "NOARG")
+         if (${runml} EQUAL 0)
+            module()
+         else()
+            ml()
+         endif()
+      else()
+         string(REPLACE "," ";" cmdelt "${cmd}")
+         list (LENGTH cmdelt eltcnt)
+         if(${eltcnt} GREATER 4)
+            list(GET cmdelt 0 elt0)
+            list(GET cmdelt 1 elt1)
+            list(GET cmdelt 2 elt2)
+            list(GET cmdelt 3 elt3)
+            list(GET cmdelt 4 elt4)
+            if (${runml} EQUAL 0)
+               module("${elt0}" "${elt1}" "${elt2}" "${elt3}" "${elt4}")
+            else()
+               ml("${elt0}" "${elt1}" "${elt2}" "${elt3}" "${elt4}")
+            endif()
+         elseif(${eltcnt} GREATER 3)
+            list(GET cmdelt 0 elt0)
+            list(GET cmdelt 1 elt1)
+            list(GET cmdelt 2 elt2)
+            list(GET cmdelt 3 elt3)
+            if (${runml} EQUAL 0)
+               module("${elt0}" "${elt1}" "${elt2}" "${elt3}")
+            else()
+               ml("${elt0}" "${elt1}" "${elt2}" "${elt3}")
+            endif()
+         elseif(${eltcnt} GREATER 2)
+            list(GET cmdelt 0 elt0)
+            list(GET cmdelt 1 elt1)
+            list(GET cmdelt 2 elt2)
+            if (${runml} EQUAL 0)
+               module("${elt0}" "${elt1}" "${elt2}")
+            else()
+               ml("${elt0}" "${elt1}" "${elt2}")
+            endif()
+         elseif(${eltcnt} GREATER 1)
+            list(GET cmdelt 0 elt0)
+            list(GET cmdelt 1 elt1)
+            if (${runml} EQUAL 0)
+               module("${elt0}" "${elt1}")
+            else()
+               ml("${elt0}" "${elt1}")
+            endif()
+         elseif(${eltcnt} GREATER 0)
+            list(GET cmdelt 0 elt0)
+            if (${runml} EQUAL 0)
+               module("${elt0}")
+            else()
+               ml("${elt0}")
+            endif()
+         else()
+            # empty arg list, means one empty arg
+            if (${runml} EQUAL 0)
+               module("")
+            else()
+               ml("")
+            endif()
+         endif()
+      endif()
+      if(NOT module_result AND NOT ${module_result} STREQUAL "")
+         set(code 1)
+      elseif(NOT ${module_result} STREQUAL "TRUE")
+         message(STATUS ${module_result})
+      endif()
+   endforeach()
+endif()
+
+if(${code})
+   message(FATAL_ERROR "")
+endif()
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

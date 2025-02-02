@@ -1,0 +1,210 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.20-locate/%M%
+#   Revision:		%I%
+#   First Edition:	1995/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		load, display, whatis, paths
+#   Modulefiles:	loc_rc1/1.0
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests the evaluation of the MODULERCFILE environment
+#			variable
+#		}C%
+#
+##############################################################################
+
+#
+#  Variables. This test forces a module load command. It will result in the
+#    environment variables "_LMFILES_", "LOADEDMODULES" and "testsuite" to
+#    be set up
+#
+
+set module_1 "loc_rc1/1.0"
+set modulefile_1 "$modpath/$module_1"
+set modulefilere_1 "$modpathre/$module_1"
+set module_2 "loc_rc2/1.0"
+set modulefile_2 "$modpath/$module_2"
+set modulefilere_2 "$modpathre/$module_2"
+set module_3 "virt_bar"
+set modulefile_3 "$modpath/loc_rcv1/.common"
+set modulefilere_3 "$modpathre/loc_rcv1/.common"
+
+#
+#  Only checked for the csh
+#
+
+set disp_csh "setenv\t\ttestsuite yes"
+set whatis_csh_1 "module-whatis\t$module_1"
+set disp_1 "$modlin\n$modulefilere_1:\n\n$whatis_csh_1\n$disp_csh\n$modlin"
+set avail_1_al "$modlin global/user modulerc $modlin\nsym_foo\\(special:@\\)\\s+\n\nKey:\n\\(@\\)=module-alias  \\(symbolic-version\\)  "
+set avail_1 "$modlin $modpathre $modlin\n$module_1\\(foo:special\\)\\s+\n\nKey:\n\\(symbolic-version\\)  "
+set what_1 "$modlin $modpathre $modlin\n         $module_1: $module_1"
+set whatis_csh_2 "module-whatis\t$module_2"
+set disp_2 "$modlin\n$modulefilere_2:\n\n$whatis_csh_2\n$disp_csh\n$modlin"
+set what_2 "$modlin $modpathre $modlin\n         $module_2: $module_2"
+set whatis_csh_3 "module-whatis\t$module_3"
+set disp_3 "$modlin\n$modulefilere_3:\n\n$whatis_csh_3\n$modlin"
+set what_3 "$modlin $modpathre $modlin\n            $module_3: $module_3"
+
+set locate_msg "$err_path'sym_foo'"
+
+#
+#  The tests
+#
+
+set env(MODULERCFILE) "$env(TESTSUITEDIR)/etc/modulerc"
+
+lappend ans [list set __MODULES_LMALTNAME $module_1&loc_rc1/foo&sym_foo/special&loc_rc1/special&al|sym_foo]
+lappend ans [list set _LMFILES_ $modulefile_1]
+lappend ans [list set LOADEDMODULES $module_1]
+lappend ans [list set testsuite yes]
+lappend anspa [list text $modulefile_1]
+test_cmd "csh" "load sym_foo" $ans
+testouterr_cmd_re "sh" "display sym_foo" "OK" "$disp_1"
+testouterr_cmd_re "sh" "whatis sym_foo" "OK" "$what_1"
+test_cmd "sh" "paths sym_foo" $anspa
+test_cmd "csh" "load sym_foo/special" $ans
+testouterr_cmd_re "sh" "display sym_foo/special" "OK" "$disp_1"
+testouterr_cmd_re "sh" "avail sym_foo/special" "OK" "$avail_1_al"
+testouterr_cmd_re "sh" "whatis sym_foo/special" "OK" "$what_1"
+test_cmd "sh" "paths sym_foo/special" $anspa
+
+skip_if_quick_mode
+
+set env(MODULERCFILE) "$env(TESTSUITEDIR)/etc/"
+test_cmd "csh" "load sym_foo" $ans
+testouterr_cmd_re "sh" "display sym_foo" "OK" "$disp_1"
+testouterr_cmd_re "sh" "whatis sym_foo" "OK" "$what_1"
+test_cmd "sh" "paths sym_foo" $anspa
+
+# test symbol set in global RC gets correct transitivity
+test_cmd "csh" "load loc_rc1/special" $ans
+testouterr_cmd_re "sh" "display loc_rc1/special" "OK" "$disp_1"
+testouterr_cmd_re "sh" "avail loc_rc1/special" "OK" "$avail_1"
+testouterr_cmd_re "sh" "whatis loc_rc1/special" "OK" "$what_1"
+test_cmd "sh" "paths loc_rc1/special" $anspa
+
+unset env(MODULERCFILE)
+testouterr_cmd "csh" "load sym_foo" "ERR" "$locate_msg"
+testouterr_cmd "sh" "display sym_foo" "ERR" "$locate_msg"
+testouterr_cmd "sh" "whatis sym_foo" "ERR" "$locate_msg"
+set anspa [list]
+lappend anspa [list text ""]
+testouterr_cmd "sh" "paths sym_foo" $anspa ""
+
+set env(MODULERCFILE) "$env(TESTSUITEDIR)/etc/rc"
+set ans [list]
+lappend ans [list set __MODULES_LMALTNAME $module_2&loc_rc2/foo&sym_foo/special2&loc_rc2/special2&loc_rc2/bar&loc_rc2/blah&al|sym_foo]
+lappend ans [list set _LMFILES_ $modulefile_2]
+lappend ans [list set LOADEDMODULES $module_2]
+lappend ans [list set testsuite yes]
+set anspa [list]
+lappend anspa [list text $modulefile_2]
+test_cmd "csh" "load sym_foo" $ans
+testouterr_cmd_re "sh" "display sym_foo" "OK" "$disp_2"
+testouterr_cmd_re "sh" "whatis sym_foo" "OK" "$what_2"
+test_cmd "sh" "paths sym_foo" $anspa
+test_cmd "csh" "load sym_foo/special2" $ans
+testouterr_cmd_re "sh" "display sym_foo/special2" "OK" "$disp_2"
+testouterr_cmd_re "sh" "whatis sym_foo/special2" "OK" "$what_2"
+test_cmd "sh" "paths sym_foo/special2" $anspa
+
+# test global RCs cascading is now achieved with 'make install-testetcrc'
+# that setup a @etcdir@/rc file for the whole 'make test' duration
+
+# test with virtual modules
+set ans [list]
+lappend ans [list set __MODULES_LMALTNAME $module_3&sym_bar/special3&virt_bar/special3&al|sym_bar&al|sym_bar_load&al|sym_bar_0]
+lappend ans [list set _LMFILES_ $modulefile_3]
+lappend ans [list set LOADEDMODULES $module_3]
+set anspa [list]
+lappend anspa [list text $modulefile_3]
+test_cmd "csh" "load sym_bar" $ans
+testouterr_cmd_re "sh" "display sym_bar" "OK" "$disp_3"
+testouterr_cmd_re "sh" "whatis sym_bar" "OK" "$what_3"
+test_cmd "sh" "paths sym_bar" $anspa
+test_cmd "csh" "load sym_bar/special3" $ans
+testouterr_cmd_re "sh" "display sym_bar/special3" "OK" "$disp_3"
+testouterr_cmd_re "sh" "whatis sym_bar/special3" "OK" "$what_3"
+test_cmd "sh" "paths sym_bar/special3" $anspa
+# check resolution of [module-info command] in a global rc
+test_cmd "csh" "load sym_bar_load" $ans
+
+# check resolution of [is-loaded mod] in a global rc
+test_cmd "csh" "load sym_bar_0" $ans
+setenv_loaded_module [list $module_2] [list $modulefile_2]
+set ans [list]
+lappend ans [list set __MODULES_LMALTNAME $module_3&sym_bar/special3&virt_bar/special3&al|sym_bar&al|sym_bar_load&al|sym_bar_1]
+lappend ans [list set _LMFILES_ $modulefile_2:$modulefile_3]
+lappend ans [list set LOADEDMODULES $module_2:$module_3]
+test_cmd_re "csh" "load sym_bar_1" $ans
+unsetenv_loaded_module
+
+
+#
+# Test erroneous MODULERCFILE file
+#
+
+set mp $modpath.3
+setenv_path_var MODULEPATH $mp
+
+# user rc file without magic cookie
+set modrcfile $env(TESTSUITEDIR)/home.3/.modulerc
+setenv_var MODULERCFILE $modrcfile
+
+set tserr $err_magic'$modrcfile'\n$err_contact
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/bar/1.0]
+lappend ans [list set LOADEDMODULES bar/1.0]
+lappend ans [list ERR]
+testouterr_cmd sh {load bar/1.0} $ans $tserr
+
+set tserr [escre $tserr]\n$modlin\n[escre $mp]/bar/1.0:\n\nmodule-whatis\tbar/1.0\n$modlin
+testouterr_cmd_re sh {display bar/1.0} ERR $tserr
+
+# user rc file with magic cookie specifying an higher module version
+set modrcfile $env(TESTSUITEDIR)/home.4/.modulerc
+setenv_var MODULERCFILE $modrcfile
+
+set tserr [moderr_minverreq $modrcfile 99]
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/bar/1.0]
+lappend ans [list set LOADEDMODULES bar/1.0]
+lappend ans [list ERR]
+testouterr_cmd sh {load bar/1.0} $ans $tserr
+
+set tserr [escre $tserr]\n$modlin\n[escre $mp]/bar/1.0:\n\nmodule-whatis\tbar/1.0\n$modlin
+testouterr_cmd_re sh {display bar/1.0} ERR $tserr
+
+
+#
+# Test multiple files defined in MODULERCFILE
+#
+
+setenv_path_var MODULEPATH $modpath.4
+setenv_var MODULERCFILE $env(TESTSUITEDIR)/etc/modulerc.multi1:$env(TESTSUITEDIR)/etc/modulerc.multi2
+
+set tserr "foo/1.0 <mytag>
+foo/2.0
+foo/9.0
+foo/alias"
+testouterr_cmd_re sh {avail -t --starts-with --indepth -o alias:tag foo} OK $tserr
+testouterr_cmd_re sh {load foo/alias} ERR $err_path'foo/4.0'
+
+setenv_var MODULERCFILE $env(TESTSUITEDIR)/etc/modulerc.multi2:$env(TESTSUITEDIR)/etc/modulerc.multi1
+testouterr_cmd_re sh {load foo/alias} ERR $err_path'foo/3.0'
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

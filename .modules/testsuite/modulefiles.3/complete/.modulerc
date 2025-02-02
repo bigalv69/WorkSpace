@@ -1,0 +1,13 @@
+#%Module
+
+if {[info exists env(TESTSUITE_COMPLETE)]} {
+    switch -- $env(TESTSUITE_COMPLETE) {
+        comprc1 {
+            complete bash cmd {-o default -F _cmd}
+        }
+        uncomprc1 {
+            uncomplete cmd
+        }
+    }
+}
+

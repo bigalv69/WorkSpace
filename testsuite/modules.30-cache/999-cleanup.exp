@@ -1,0 +1,49 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.30-cache/%M%
+#   Revision:		%I%
+#   First Edition:	2022/11/12
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:
+#   Modulefiles:
+#   Sub-Command:
+#
+#   Comment:	%C{
+# 			Cleans out some variables used in the test
+#		}C%
+#
+##############################################################################
+
+set i 1
+while {[info exists mod$i]} {
+    unset mod$i
+    unset mod${i}c
+    incr i
+}
+
+set i 1
+while {[info exists modrc$i]} {
+    unset modrc$i
+    unset modrc${i}c
+    incr i
+}
+
+unset mp1
+unset mp2
+unset mp1cache
+unset mp2cache
+
+unset i
+
+rename create_simple_module_setup {}
+rename create_diverse_module_setup {}
+rename delete_module_setup {}
+
+# restore orig saved test env
+save_test_env

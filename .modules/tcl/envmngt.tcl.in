@@ -1,0 +1,1836 @@
+##########################################################################
+
+# ENVMNGT.TCL, environment management procedures
+# Copyright (C) 2002-2004 Mark Lakata
+# Copyright (C) 2004-2017 Kent Mein
+# Copyright (C) 2016-2024 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+proc incrErrorCount {} {
+   updateErrorCount [expr {[getState error_count] + 1}]
+}
+
+proc decrErrorCount {} {
+   updateErrorCount [expr {[getState error_count] - 1}]
+}
+
+proc updateErrorCount {count} {
+   # hold update of error count
+   if {[depthState reportholdid] > 0} {
+      lappend ::g_holdReport([currentState reportholdid]) [list\
+         updateErrorCount $count]
+   } else {
+      setState error_count $count
+   }
+}
+
+proc renderFalse {} {
+   if {[isStateDefined false_rendered]} {
+      reportDebug {false already rendered}
+   # no shell code to render false if shell not set
+   } elseif {[isStateDefined shell]} {
+      # setup flag to render only once
+      setState false_rendered 1
+
+      # render a false value most of the time through a variable assignment
+      # that will be looked at in the shell module function calling
+      # modulecmd.tcl to return in turns a boolean status. Except for python
+      # and cmake, the value assigned to variable is also returned as the
+      # entire rendering status
+      switch -- [getState shelltype] {
+         sh - csh - fish {
+            # no need to set a variable on real shells as last statement
+            # result can easily be checked
+            lappend ::g_shcode_out {test 0 = 1;}
+         }
+         tcl {
+            lappend ::g_shcode_out {set _mlstatus 0;}
+         }
+         cmd {
+            lappend ::g_shcode_out {set errorlevel=1}
+         }
+         perl {
+            lappend ::g_shcode_out {{ no strict 'vars'; $_mlstatus = 0; }}
+         }
+         python {
+            lappend ::g_shcode_out {_mlstatus = False}
+         }
+         ruby {
+            lappend ::g_shcode_out {_mlstatus = false}
+         }
+         lisp {
+            lappend ::g_shcode_out {nil}
+         }
+         cmake {
+            lappend ::g_shcode_out {set(_mlstatus FALSE)}
+         }
+         r {
+            lappend ::g_shcode_out {mlstatus <- FALSE}
+         }
+      }
+   }
+}
+
+proc renderTrue {} {
+   # render a true value most of the time through a variable assignment that
+   # will be looked at in the shell module function calling modulecmd.tcl to
+   # return in turns a boolean status. Except for python and cmake, the
+   # value assigned to variable is also returned as the full rendering status
+   switch -- [getState shelltype] {
+      sh - csh - fish {
+         # no need to set a variable on real shells as last statement
+         # result can easily be checked
+         lappend ::g_shcode_out {test 0;}
+      }
+      tcl {
+         lappend ::g_shcode_out {set _mlstatus 1;}
+      }
+      cmd {
+         lappend ::g_shcode_out {set errorlevel=0}
+      }
+      perl {
+         lappend ::g_shcode_out {{ no strict 'vars'; $_mlstatus = 1; }}
+      }
+      python {
+         lappend ::g_shcode_out {_mlstatus = True}
+      }
+      ruby {
+         lappend ::g_shcode_out {_mlstatus = true}
+      }
+      lisp {
+         lappend ::g_shcode_out {t}
+      }
+      cmake {
+         lappend ::g_shcode_out {set(_mlstatus TRUE)}
+      }
+      r {
+         lappend ::g_shcode_out {mlstatus <- TRUE}
+      }
+   }
+}
+
+proc renderText {text} {
+   # render a text value most of the time through a variable assignment that
+   # will be looked at in the shell module function calling modulecmd.tcl to
+   # return in turns a string value.
+   switch -- [getState shelltype] {
+      sh - csh - fish {
+         foreach word $text {
+            # no need to set a variable on real shells, echoing text will make
+            # it available as result
+            lappend ::g_shcode_out "echo '$word';"
+         }
+      }
+      tcl {
+         lappend ::g_shcode_out "set _mlstatus \"$text\";"
+      }
+      cmd {
+         foreach word $text {
+            lappend ::g_shcode_out "echo $word"
+         }
+      }
+      perl {
+         lappend ::g_shcode_out "{ no strict 'vars'; \$_mlstatus = '$text'; }"
+      }
+      python {
+         lappend ::g_shcode_out "_mlstatus = '$text'"
+      }
+      ruby {
+         lappend ::g_shcode_out "_mlstatus = '$text'"
+      }
+      lisp {
+         lappend ::g_shcode_out "(message \"$text\")"
+      }
+      cmake {
+         lappend ::g_shcode_out "set(_mlstatus \"$text\")"
+      }
+      r {
+         lappend ::g_shcode_out "mlstatus <- '$text'"
+      }
+   }
+}
+
+proc renderSettings {} {
+   global g_stateEnvVars g_stateAliases g_stateFunctions g_stateCompletes\
+      g_newXResources g_delXResources g_shcode_out
+
+   # preliminaries if there is stuff to render
+   if {[getState autoinit] || [array size g_stateEnvVars] || [array size\
+      g_stateAliases] || [array size g_newXResources] || [array size\
+      g_stateFunctions] || [array size g_stateCompletes] || [array size\
+      g_delXResources] || [info exists ::g_changeDir] || [info exists\
+      ::g_stdoutPuts] || [info exists ::g_prestdoutPuts] || [info exists\
+      ::g_return_text]} {
+      switch -- [getState shelltype] {
+         python {
+            lappend g_shcode_out {import os}
+         }
+      }
+      set has_rendered 1
+   } else {
+      set has_rendered 0
+   }
+
+   # send pre content deferred during modulefile interpretation
+   if {[info exists ::g_prestdoutPuts]} {
+      foreach {newline msg} $::g_prestdoutPuts {
+         append outmsg $msg
+         if {$newline} {
+            lappend g_shcode_out $outmsg
+            unset outmsg
+         }
+      }
+      # add last remaining message
+      if {[info exists outmsg]} {
+         lappend g_shcode_out $outmsg
+      }
+   }
+
+   if {[getState autoinit]} {
+      renderAutoinit
+   }
+
+   # filter Modules-specific environment variables for mod-to-sh subcmd
+   if {[getState modtosh_real_shell] ne {}} {
+      foreach globvar [getModulesEnvVarGlobList 1] {
+         foreach var [array names g_stateEnvVars -glob $globvar] {
+            unset g_stateEnvVars($var)
+         }
+      }
+   }
+
+   # new environment variables
+   foreach var [array names g_stateEnvVars] {
+      switch -- $g_stateEnvVars($var) {
+         new {
+            switch -- [getState shelltype] {
+               csh {
+                  set val [charEscaped $::env($var)]
+                  # csh barfs on long env vars
+                  if {[getState shell] eq {csh} && [string length $val] >\
+                     [getConf csh_limit]} {
+                     if {$var eq {PATH}} {
+                        reportWarning "PATH exceeds [getConf csh_limit]\
+                           characters, truncating and appending\
+                           /usr/bin:/bin ..."
+                        set val [string range $val 0 [getConf\
+                           csh_limit]-1]:/usr/bin:/bin
+                     } else {
+                        reportWarning "$var exceeds [getConf csh_limit]\
+                           characters, truncating..."
+                         set val [string range $val 0 [getConf csh_limit]-1]
+                     }
+                  }
+                  lappend g_shcode_out "setenv $var $val;"
+               }
+               sh {
+                  lappend g_shcode_out "$var=[charEscaped $::env($var)];\
+                     export $var;"
+               }
+               fish {
+                  set val [charEscaped $::env($var)]
+                  # fish shell has special treatment for PATH variable
+                  # so its value should be provided as a list separated
+                  # by spaces not by semi-colons
+                  if {$var eq {PATH}} {
+                     regsub -all : $val { } val
+                  }
+                  lappend g_shcode_out "set -xg $var $val;"
+               }
+               tcl {
+                  set val $::env($var)
+                  lappend g_shcode_out "set ::env($var) {$val};"
+               }
+               cmd {
+                  set val $::env($var)
+                  lappend g_shcode_out "set $var=$val"
+               }
+               perl {
+                  set val [charEscaped $::env($var) \']
+                  lappend g_shcode_out "\$ENV{'$var'} = '$val';"
+               }
+               python {
+                  set val [charEscaped $::env($var) \']
+                  lappend g_shcode_out "os.environ\['$var'\] = '$val'"
+               }
+               ruby {
+                  set val [charEscaped $::env($var) \']
+                  lappend g_shcode_out "ENV\['$var'\] = '$val'"
+               }
+               lisp {
+                  set val [charEscaped $::env($var) \"]
+                  lappend g_shcode_out "(setenv \"$var\" \"$val\")"
+               }
+               cmake {
+                  set val [charEscaped $::env($var) \"]
+                  lappend g_shcode_out "set(ENV{$var} \"$val\")"
+               }
+               r {
+                  set val [charEscaped $::env($var) {\\'}]
+                  lappend g_shcode_out "Sys.setenv('$var'='$val')"
+               }
+            }
+         }
+         del {
+            switch -- [getState shelltype] {
+               csh {
+                  lappend g_shcode_out "unsetenv $var;"
+               }
+               sh {
+                  lappend g_shcode_out "unset $var;"
+               }
+               fish {
+                  lappend g_shcode_out "set -e $var;"
+               }
+               tcl {
+                  lappend g_shcode_out "catch {unset ::env($var)};"
+               }
+               cmd {
+                  lappend g_shcode_out "set $var="
+               }
+               perl {
+                  lappend g_shcode_out "delete \$ENV{'$var'};"
+               }
+               python {
+                  lappend g_shcode_out "os.environ\['$var'\] = ''"
+                  lappend g_shcode_out "del os.environ\['$var'\]"
+               }
+               ruby {
+                  lappend g_shcode_out "ENV\['$var'\] = nil"
+               }
+               lisp {
+                  lappend g_shcode_out "(setenv \"$var\" nil)"
+               }
+               cmake {
+                  lappend g_shcode_out "unset(ENV{$var})"
+               }
+               r {
+                  lappend g_shcode_out "Sys.unsetenv('$var')"
+               }
+            }
+         }
+      }
+   }
+
+   foreach var [array names g_stateAliases] {
+      switch -- $g_stateAliases($var) {
+         new {
+            set val $::g_Aliases($var)
+            # convert $n in !!:n and $* in !* on csh (like on compat version)
+            if {[getState shelltype] eq {csh}} {
+               regsub -all {([^\\]|^)\$([0-9]+)} $val {\1!!:\2} val
+               regsub -all {([^\\]|^)\$\*} $val {\1!*} val
+            }
+            # unescape \$ after now csh-specific conversion is over
+            regsub -all {\\\$} $val {$} val
+            switch -- [getState shelltype] {
+               csh {
+                  set val [charEscaped $val]
+                  lappend g_shcode_out "alias $var $val;"
+               }
+               sh {
+                  set val [charEscaped $val]
+                  lappend g_shcode_out "alias $var=$val;"
+               }
+               fish {
+                  set val [charEscaped $val]
+                  lappend g_shcode_out "alias $var $val;"
+               }
+               cmd {
+                  lappend g_shcode_out "doskey $var=$val"
+               }
+            }
+         }
+         del {
+            switch -- [getState shelltype] {
+               csh {
+                  lappend g_shcode_out "unalias $var;"
+               }
+               sh {
+                  lappend g_shcode_out "unalias $var 2>/dev/null || true;"
+               }
+               fish {
+                  lappend g_shcode_out "functions -e $var;"
+               }
+               cmd {
+                  lappend g_shcode_out "doskey $var="
+               }
+            }
+         }
+      }
+   }
+   foreach funcname [array names g_stateFunctions] {
+      switch -- $g_stateFunctions($funcname) {
+         new {
+            # trim function body to smoothly add a finishing ;
+            set val [string trim $::g_Functions($funcname) "; \t\n\r"]
+            switch -- [getState shell] {
+               sh - ksh - zsh {
+                  lappend g_shcode_out "$funcname () { $val; };"
+               }
+               bash {
+                  lappend g_shcode_out "$funcname () { $val; }; export -f\
+                     $funcname;"
+               }
+               fish {
+                  lappend g_shcode_out "function $funcname; $val; end;"
+               }
+            }
+         }
+         del {
+            switch -- [getState shelltype] {
+               sh {
+                  lappend g_shcode_out "unset -f $funcname 2>/dev/null ||\
+                     true;"
+               }
+               fish {
+                  lappend g_shcode_out "functions -e $funcname;"
+               }
+            }
+         }
+      }
+   }
+   foreach compname [array names g_stateCompletes] {
+      switch -- $g_stateCompletes($compname) {
+         new {
+            foreach {compshell body} $::g_Completes($compname) {
+               # skip definition not made for current shell
+               if {$compshell eq [getState shell]} {
+                  switch -- [getState shell] {
+                     bash {
+                        lappend g_shcode_out "complete $body $compname;"
+                     }
+                     tcsh {
+                        lappend g_shcode_out "complete $compname $body;"
+                     }
+                     fish {
+                        # ensure pre-existing fish completion is cleared
+                        if {![info exists fishcompclear($compname)]} {
+                           lappend g_shcode_out "complete -e -c $compname;"
+                           set fishcompclear($compname) 1
+                        }
+                        lappend g_shcode_out "complete -c $compname $body;"
+                     }
+                  }
+               }
+            }
+         }
+         del {
+            switch -- [getState shell] {
+               bash {
+                  lappend g_shcode_out "complete -r $compname;"
+               }
+               tcsh {
+                  lappend g_shcode_out "uncomplete $compname;"
+               }
+               fish {
+                  lappend g_shcode_out "complete -e -c $compname;"
+               }
+            }
+         }
+      }
+   }
+
+   # preliminaries for x-resources stuff
+   if {[array size g_newXResources] || [array size g_delXResources]} {
+      switch -- [getState shelltype] {
+         python {
+            lappend g_shcode_out {import subprocess}
+         }
+         ruby {
+            lappend g_shcode_out {require 'open3'}
+         }
+      }
+   }
+
+   # new x resources
+   if {[array size g_newXResources]} {
+      # xrdb executable has already be verified in x-resource
+      set xrdb [getCommandPath xrdb]
+      foreach var [array names g_newXResources] {
+         set val $g_newXResources($var)
+         # empty val means that var is a file to parse
+         if {$val eq {}} {
+            switch -- [getState shelltype] {
+               sh - csh - fish {
+                  lappend g_shcode_out "$xrdb -merge $var;"
+               }
+               tcl {
+                  lappend g_shcode_out "exec $xrdb -merge $var;"
+               }
+               perl {
+                  lappend g_shcode_out "system(\"$xrdb -merge $var\");"
+               }
+               python {
+                  set var [charEscaped $var \']
+                  lappend g_shcode_out "subprocess.Popen(\['$xrdb',\
+                     '-merge', '$var'\])"
+               }
+               ruby {
+                  set var [charEscaped $var \']
+                  lappend g_shcode_out "Open3.popen2('$xrdb -merge $var')"
+               }
+               lisp {
+                  lappend g_shcode_out "(shell-command-to-string \"$xrdb\
+                     -merge $var\")"
+               }
+               cmake {
+                  lappend g_shcode_out "execute_process(COMMAND $xrdb -merge\
+                     $var)"
+               }
+               r {
+                  set var [charEscaped $var {\\'}]
+                  lappend g_shcode_out "system('$xrdb -merge $var')"
+               }
+            }
+         } else {
+            switch -- [getState shelltype] {
+               sh - csh - fish {
+                  set var [charEscaped $var \"]
+                  set val [charEscaped $val \"]
+                  lappend g_shcode_out "echo \"$var: $val\" | $xrdb -merge;"
+               }
+               tcl {
+                  lappend g_shcode_out "set XRDBPIPE \[open \"|$xrdb -merge\"\
+                     r+\];"
+                  set var [charEscaped $var \"]
+                  set val [charEscaped $val \"]
+                  lappend g_shcode_out "puts \$XRDBPIPE \"$var: $val\";"
+                  lappend g_shcode_out {close $XRDBPIPE;}
+                  lappend g_shcode_out {unset XRDBPIPE;}
+               }
+               perl {
+                  lappend g_shcode_out "open(XRDBPIPE, \"|$xrdb -merge\");"
+                  set var [charEscaped $var \"]
+                  set val [charEscaped $val \"]
+                  lappend g_shcode_out "print XRDBPIPE \"$var: $val\\n\";"
+                  lappend g_shcode_out {close XRDBPIPE;}
+               }
+               python {
+                  set var [charEscaped $var \']
+                  set val [charEscaped $val \']
+                  lappend g_shcode_out "subprocess.Popen(\['$xrdb',\
+                     '-merge'\],\
+                     stdin=subprocess.PIPE).communicate(input='$var:\
+                     $val\\n')"
+               }
+               ruby {
+                  set var [charEscaped $var \']
+                  set val [charEscaped $val \']
+                  lappend g_shcode_out "Open3.popen2('$xrdb -merge') {|i,o,t|\
+                     i.puts '$var: $val'}"
+               }
+               lisp {
+                  lappend g_shcode_out "(shell-command-to-string \"echo $var:\
+                     $val | $xrdb -merge\")"
+               }
+               cmake {
+                  set var [charEscaped $var \"]
+                  set val [charEscaped $val \"]
+                  lappend g_shcode_out "execute_process(COMMAND echo \"$var:\
+                     $val\" COMMAND $xrdb -merge)"
+               }
+               r {
+                  set var [charEscaped $var {\\'}]
+                  set val [charEscaped $val {\\'}]
+                  lappend g_shcode_out "system('$xrdb -merge', input='$var:\
+                     $val')"
+               }
+            }
+         }
+      }
+   }
+
+   if {[array size g_delXResources]} {
+      ##nagelfar ignore Found constant
+      set xrdb [getCommandPath xrdb]
+      set xres_to_del {}
+      foreach var [array names g_delXResources] {
+         # empty val means that var is a file to parse
+         if {$g_delXResources($var) eq {}} {
+            # xresource file has to be parsed to find what resources
+            # are declared there and need to be unset
+            foreach fline [split [exec $xrdb -n load $var] \n] {
+               lappend xres_to_del [lindex [split $fline :] 0]
+            }
+         } else {
+            lappend xres_to_del $var
+         }
+      }
+
+      # xresource strings are unset by emptying their value since there
+      # is no command of xrdb that can properly remove one property
+      switch -- [getState shelltype] {
+         sh - csh - fish {
+            foreach var $xres_to_del {
+               lappend g_shcode_out "echo \"$var:\" | $xrdb -merge;"
+            }
+         }
+         tcl {
+            foreach var $xres_to_del {
+               lappend g_shcode_out "set XRDBPIPE \[open \"|$xrdb -merge\"\
+                  r+\];"
+               set var [charEscaped $var \"]
+               lappend g_shcode_out "puts \$XRDBPIPE \"$var:\";"
+               lappend g_shcode_out {close $XRDBPIPE;}
+               lappend g_shcode_out {unset XRDBPIPE;}
+            }
+         }
+         perl {
+            foreach var $xres_to_del {
+               lappend g_shcode_out "open(XRDBPIPE, \"|$xrdb -merge\");"
+               set var [charEscaped $var \"]
+               lappend g_shcode_out "print XRDBPIPE \"$var:\\n\";"
+               lappend g_shcode_out {close XRDBPIPE;}
+            }
+         }
+         python {
+            foreach var $xres_to_del {
+               set var [charEscaped $var \']
+               lappend g_shcode_out "subprocess.Popen(\['$xrdb', '-merge'\],\
+                  stdin=subprocess.PIPE).communicate(input='$var:\\n')"
+            }
+         }
+         ruby {
+            foreach var $xres_to_del {
+               set var [charEscaped $var \']
+               lappend g_shcode_out "Open3.popen2('$xrdb -merge') {|i,o,t|\
+                  i.puts '$var:'}"
+            }
+         }
+         lisp {
+            foreach var $xres_to_del {
+               lappend g_shcode_out "(shell-command-to-string \"echo $var: |\
+                  $xrdb -merge\")"
+            }
+         }
+         cmake {
+            foreach var $xres_to_del {
+               set var [charEscaped $var \"]
+               lappend g_shcode_out "execute_process(COMMAND echo \"$var:\"\
+                  COMMAND $xrdb -merge)"
+            }
+         }
+         r {
+            foreach var $xres_to_del {
+               set var [charEscaped $var {\\'}]
+               lappend g_shcode_out "system('$xrdb -merge', input='$var:')"
+            }
+         }
+      }
+   }
+
+   if {[info exists ::g_changeDir]} {
+      switch -- [getState shelltype] {
+         sh - csh - fish {
+            lappend g_shcode_out "cd '$::g_changeDir';"
+         }
+         tcl {
+            lappend g_shcode_out "cd \"$::g_changeDir\";"
+         }
+         cmd {
+            lappend g_shcode_out "cd $::g_changeDir"
+         }
+         perl {
+            lappend g_shcode_out "chdir '$::g_changeDir';"
+         }
+         python {
+            lappend g_shcode_out "os.chdir('$::g_changeDir')"
+         }
+         ruby {
+            lappend g_shcode_out "Dir.chdir('$::g_changeDir')"
+         }
+         lisp {
+            lappend g_shcode_out "(shell-command-to-string \"cd\
+               '$::g_changeDir'\")"
+         }
+         r {
+            lappend g_shcode_out "setwd('$::g_changeDir')"
+         }
+      }
+      # cannot change current directory of cmake "shell"
+   }
+
+   # send content deferred during modulefile interpretation
+   if {[info exists ::g_stdoutPuts]} {
+      foreach {newline msg} $::g_stdoutPuts {
+         append outmsg $msg
+         if {$newline} {
+            lappend g_shcode_out $outmsg
+            unset outmsg
+         }
+      }
+      # add last remaining message
+      if {[info exists outmsg]} {
+         lappend g_shcode_out $outmsg
+      }
+   }
+
+   # if currently processing mod-to-sh subcmd, send shell code to the message
+   # channel then reset code and shell state to get evaluation result shell
+   # code on stdout channel
+   if {[getState modtosh_real_shell] ne {}} {
+      if {[info exists g_shcode_out]} {
+         report [join $::g_shcode_out \n]
+         unset g_shcode_out
+      }
+
+      setState shell [getState modtosh_real_shell]
+      unsetState shelltype
+   }
+
+   # return text value if defined even if error happened
+   if {[info exists ::g_return_text]} {
+      reportDebug {text value should be returned.}
+      renderText $::g_return_text
+   } elseif {[getState error_count] > 0} {
+      reportDebug "[getState error_count] error(s) detected."
+      renderFalse
+   } elseif {[getState return_false]} {
+      reportDebug {false value should be returned.}
+      renderFalse
+   } elseif {$has_rendered} {
+      # finish with true statement if something has been put
+      renderTrue
+   }
+}
+
+# Output all gathered shell code to stdout. This is a separate proc rather the
+# final code of renderSettings as such output is also done when exiting after
+# an error. Stdout is flushed from flushAndExit proc
+proc renderFlush {} {
+   if {[info exists ::g_shcode_out]} {
+      # required to work on cygwin, shouldn't hurt real linux
+      fconfigure stdout -translation lf
+
+      puts stdout [join $::g_shcode_out \n]
+   }
+}
+
+proc renderAutoinit {} {
+   # automatically detect which tclsh should be used for
+   # future module commands
+   set tclshbin [info nameofexecutable]
+
+   # ensure script path is absolute
+   set ::argv0 [getAbsolutePath $::argv0]
+
+   ##nagelfar ignore #462 Close brace not aligned with line
+   switch -- [getState shelltype] {
+      csh {
+         set pre_hi {set _histchars = $histchars; unset histchars;}
+         set post_hi {set histchars = $_histchars; unset _histchars;}
+         set pre_pr {set _prompt=$prompt:q; set prompt="";}
+         set post_pr {set prompt=$_prompt:q; unset _prompt;}
+         # apply workaround for Tcsh history if set
+         set eval_cmd [expr {[getConf wa_277] ? "eval `$tclshbin\
+            '\"'\"'$::argv0'\"'\"' [getState shell] \\!*`;" : "eval\
+            \"`$tclshbin '\"'\"'$::argv0'\"'\"' [getState shell] \\!*:q`\";"}]
+         set pre_ex {set _exit="$status";}
+         set post_ex {test 0 = $_exit}
+
+         set fdef "if ( \$?histchars && \$?prompt )\
+alias module '$pre_hi $pre_pr $eval_cmd $pre_ex $post_hi $post_pr $post_ex' ;
+if ( \$?histchars && ! \$?prompt )\
+alias module '$pre_hi $eval_cmd $pre_ex $post_hi $post_ex' ;
+if ( ! \$?histchars && \$?prompt )\
+alias module '$pre_pr $eval_cmd $pre_ex $post_pr $post_ex' ;
+if ( ! \$?histchars && ! \$?prompt ) alias module '$eval_cmd' ;"
+         if {[getConf ml]} {
+            append fdef {
+alias ml 'module ml \!*' ;}
+         }
+      }
+      sh {
+         # Considering the diversity of ways local variables are handled
+         # through the sh-variants ('local' known everywhere except on ksh,
+         # 'typeset' known everywhere except on pure-sh, and on some systems
+         # the pure-sh is in fact a 'ksh'), no local variables are defined and
+         # these variables that should have been local are unset at the end
+
+         # on zsh, word splitting should be enabled explicitly
+         set wsplit [expr {[getState shell] eq {zsh} ? {^^=} : {}}]
+         # build quarantine mechanism in module function
+         # an empty runtime variable is set even if no corresponding
+         # MODULES_RUNENV_* variable found, as var cannot be unset on
+         # modified environment command-line
+         set fdef "_module_raw() {"
+         if {[getConf silent_shell_debug]} {
+            append fdef {
+   unset _mlshdbg;
+   if [ "${MODULES_SILENT_SHELL_DEBUG:-0}" = '1' ]; then
+      case "$-" in
+         *v*x*) set +vx; _mlshdbg='vx' ;;
+         *v*) set +v; _mlshdbg='v' ;;
+         *x*) set +x; _mlshdbg='x' ;;
+         *) _mlshdbg='' ;;
+      esac;
+   fi;}
+         }
+         if {[getConf quarantine_support]} {
+            append fdef "
+   unset _mlre _mlIFS;
+   if \[ -n \"\${IFS+x}\" \]; then
+      _mlIFS=\$IFS;
+   fi;
+   IFS=' ';
+   for _mlv in \${${wsplit}MODULES_RUN_QUARANTINE:-}; do"
+            ##nagelfar ignore #4 Too long line
+            append fdef {
+      if [ "${_mlv}" = "${_mlv##*[!A-Za-z0-9_]}" ] && [ "${_mlv}" = "${_mlv#[0-9]}" ]; then
+         if [ -n "$(eval 'echo ${'"$_mlv"'+x}')" ]; then
+            _mlre="${_mlre:-}__MODULES_QUAR_${_mlv}='$(eval 'echo ${'"$_mlv"'}')' ";
+         fi;
+         _mlrv="MODULES_RUNENV_${_mlv}";
+         _mlre="${_mlre:-}${_mlv}='$(eval 'echo ${'"$_mlrv"':-}')' ";
+      fi;
+   done;
+   if [ -n "${_mlre:-}" ]; then
+      _mlre="${_mlre:-}__MODULES_QUARANTINE_SET=1 ";}
+            append fdef "\n      eval \"\$(eval \${${wsplit}_mlre} $tclshbin\
+               '$::argv0' [getState shell] '\"\$@\"')\";
+   else
+      eval \"\$($tclshbin '$::argv0' [getState shell] \"\$@\")\";
+   fi;"
+         } else {
+            append fdef "
+   eval \"\$($tclshbin '$::argv0' [getState shell] \"\$@\")\";"
+         }
+         append fdef {
+   _mlstatus=$?;}
+         if {[getConf quarantine_support]} {
+            append fdef {
+   if [ -n "${_mlIFS+x}" ]; then
+      IFS=$_mlIFS;
+   else
+      unset IFS;
+   fi;
+   unset _mlre _mlv _mlrv _mlIFS;}
+         }
+         if {[getConf silent_shell_debug]} {
+            append fdef {
+   if [ -n "${_mlshdbg:-}" ]; then
+      set -"$_mlshdbg";
+   fi;
+   unset _mlshdbg;}
+         }
+         append fdef {
+   return $_mlstatus;}
+         # define both _module_raw and module functions in any cases to allow
+         # content redirection when command-line switch is used (--redirect or
+         # --no-redirect)
+         # content is redirected by default when shell session is attached to
+         # a terminal (non-terminal session are not redirected to avoid
+         # breaking things like scp or sftp transfer)
+         # use local/typeset variable in this context as we cannot unset it
+         # afterward (since _module_raw should be the cmd to return status)
+         set localcmd [expr {[getState shell] eq {ksh} ? {typeset} : {local}}]
+         ##nagelfar ignore Unescaped close brace
+         append fdef "\n};\nmodule() {
+   $localcmd _mlredir=[getState is_stderr_tty];\n"
+         append fdef {   if [ -n "${MODULES_REDIRECT_OUTPUT+x}" ]; then
+      if [ "$MODULES_REDIRECT_OUTPUT" = '0' ]; then
+         _mlredir=0;
+      elif [ "$MODULES_REDIRECT_OUTPUT" = '1' ]; then
+         _mlredir=1;
+      fi;
+   fi;
+   case " $@ " in
+      *' --no-redirect '*) _mlredir=0 ;;
+      *' --redirect '*) _mlredir=1 ;;
+   esac;
+   if [ $_mlredir -eq 0 ]; then
+      _module_raw "$@";
+   else
+      _module_raw "$@" 2>&1;
+   fi;}
+         append fdef "\n};"
+         if {[getState shell] eq {bash}} {
+            append fdef {
+export -f _module_raw;
+export -f module;}
+         }
+         if {[getConf ml]} {
+            append fdef {
+ml() { module ml "$@"; };}
+            if {[getState shell] eq {bash}} {
+               append fdef {
+export -f ml;}
+            }
+         }
+      }
+      fish {
+         set fdef "function _module_raw\n"
+         if {[getConf quarantine_support]} {
+            append fdef {   set -l _mlre ''; set -l _mlv; set -l _mlrv;
+   for _mlv in (string split ' ' $MODULES_RUN_QUARANTINE)
+      if string match -r '^[A-Za-z_][A-Za-z0-9_]*$' $_mlv >/dev/null
+         if set -q $_mlv
+            set _mlre $_mlre"__MODULES_QUAR_"$_mlv"='$$_mlv' "
+         end
+         set _mlrv "MODULES_RUNENV_$_mlv"
+         set _mlre "$_mlre$_mlv='$$_mlrv' "
+      end
+   end
+   if [ -n "$_mlre" ]
+      set _mlre "env $_mlre __MODULES_QUARANTINE_SET=1"
+   end}
+            # use "| source -" rather than "eval" to be able
+            # to redirect stderr after stdout being evaluated
+            append fdef "\n   eval \$_mlre $tclshbin \\'$::argv0\\' [getState\
+               shell] (string escape -- \$argv) | source -\n"
+         } else {
+            append fdef "   eval $tclshbin \\'$::argv0\\' [getState shell]\
+               (string escape -- \$argv) | source -\n"
+         }
+         append fdef "end
+function module
+   set _mlredir [getState is_stderr_tty]
+   if set -q MODULES_REDIRECT_OUTPUT
+      if \[ \"\$MODULES_REDIRECT_OUTPUT\" = '0' \]
+         set _mlredir 0
+      else if \[ \"\$MODULES_REDIRECT_OUTPUT\" = '1' \]
+         set _mlredir 1
+      end
+   end
+   if contains -- --no-redirect \$argv; or begin ; \[ \$_mlredir -eq 0\
+      \]; and not contains -- --redirect \$argv ; end
+      _module_raw \$argv
+   else
+      _module_raw \$argv 2>&1
+   end
+end"
+         if {[getConf ml]} {
+            append fdef {
+function ml
+   module ml $argv
+end}
+         }
+      }
+      tcl {
+         set fdef "proc module {args} {"
+         if {[getConf quarantine_support]} {
+            append fdef {
+   set _mlre {};
+   if {[info exists ::env(MODULES_RUN_QUARANTINE)]} {
+      foreach _mlv [split $::env(MODULES_RUN_QUARANTINE) " "] {
+         if {[regexp {^[A-Za-z_][A-Za-z0-9_]*$} $_mlv]} {
+            if {[info exists ::env($_mlv)]} {
+               lappend _mlre "__MODULES_QUAR_${_mlv}=$::env($_mlv)"
+            }
+            set _mlrv "MODULES_RUNENV_${_mlv}"
+            lappend _mlre [expr {[info exists ::env($_mlrv)] ?\
+               "${_mlv}=$::env($_mlrv)" : "${_mlv}="}]
+         }
+      }
+      if {[llength $_mlre]} {
+         lappend _mlre "__MODULES_QUARANTINE_SET=1"
+         set _mlre [linsert $_mlre 0 "env"]
+      }
+   }}
+         }
+         append fdef {
+   set _mlstatus 1;}
+         if {[getConf quarantine_support]} {
+            append fdef "\n   catch {exec {*}\$_mlre \"$tclshbin\"\
+               \"$::argv0\" \"[getState shell]\" {*}\$args 2>@stderr}\
+               script\n"
+         } else {
+            append fdef "\n   catch {exec \"$tclshbin\" \"$::argv0\"\
+               \"[getState shell]\" {*}\$args 2>@stderr} script\n"
+         }
+         append fdef {   eval $script;
+   return $_mlstatus}
+         append fdef "\n}"
+         if {[getConf ml]} {
+            append fdef {
+proc ml {args} {
+   return [module ml {*}$args]
+}}
+         }
+      }
+      cmd {
+         reportErrorAndExit {No autoinit mode available for 'cmd' shell}
+      }
+      perl {
+         set fdef "sub module {"
+         if {[getConf quarantine_support]} {
+            append fdef {
+   my $_mlre = '';
+   if (defined $ENV{'MODULES_RUN_QUARANTINE'}) {
+      foreach my $_mlv (split(' ', $ENV{'MODULES_RUN_QUARANTINE'})) {
+         if ($_mlv =~ /^[A-Za-z_][A-Za-z0-9_]*$/) {
+            if (defined $ENV{$_mlv}) {
+               $_mlre .= "__MODULES_QUAR_${_mlv}='$ENV{$_mlv}' ";
+            }
+            my $_mlrv = "MODULES_RUNENV_$_mlv";
+            $_mlre .= "$_mlv='$ENV{$_mlrv}' ";
+        }
+      }
+      if ($_mlre ne "") {
+         $_mlre = "env ${_mlre}__MODULES_QUARANTINE_SET=1 ";
+      }
+   }}
+         }
+         append fdef {
+   my $args = '';
+   if (@_ > 0) {
+      $args = '"' . join('" "', @_) . '"';
+   }
+   my $_mlstatus = 1;}
+         if {[getConf quarantine_support]} {
+            append fdef "\n   eval `\${_mlre}$tclshbin '$::argv0' perl\
+               \$args`;\n"
+         } else {
+            append fdef "\n   eval `$tclshbin '$::argv0' perl \$args`;\n"
+         }
+         append fdef {   return $_mlstatus;}
+         append fdef "\n}"
+         if {[getConf ml]} {
+            append fdef {
+sub ml {
+   return module('ml', @_);
+}}
+         }
+      }
+      python {
+         set fdef {import sys, re, subprocess
+def module(*arguments):}
+         if {[getConf quarantine_support]} {
+            append fdef {
+   _mlre = os.environ.copy()
+   if 'MODULES_RUN_QUARANTINE' in os.environ:
+      for _mlv in os.environ['MODULES_RUN_QUARANTINE'].split():
+         if re.match('^[A-Za-z_][A-Za-z0-9_]*$', _mlv):
+            if _mlv in os.environ:
+               _mlre['__MODULES_QUAR_' + _mlv] = os.environ[_mlv]
+            _mlrv = 'MODULES_RUNENV_' + _mlv
+            if _mlrv in os.environ:
+               _mlre[_mlv] = os.environ[_mlrv]
+            else:
+               _mlre[_mlv] = ''
+      _mlre['__MODULES_QUARANTINE_SET'] = '1'}
+         }
+         append fdef {
+   ns = {}}
+         if {[getConf quarantine_support]} {
+            append fdef "\n   out, err = subprocess.Popen(\['$tclshbin',\
+               '$::argv0', 'python'\] + list(arguments),\
+               stdout=subprocess.PIPE, stderr=subprocess.PIPE,\
+               env=_mlre).communicate()\n"
+         } else {
+            append fdef "\n   out, err = subprocess.Popen(\['$tclshbin',\
+               '$::argv0', 'python'\] + list(arguments),\
+               stdout=subprocess.PIPE,\
+               stderr=subprocess.PIPE).communicate()\n"
+         }
+         append fdef {   exec(out, ns)
+   if '_mlstatus' in ns:
+      _mlstatus = ns['_mlstatus']
+   else:
+      _mlstatus = True
+   if err.decode():
+      print(err.decode(), end='', file=sys.stderr)
+   return _mlstatus}
+         if {[getConf ml]} {
+            append fdef {
+def ml(*arguments):
+   return module('ml', *arguments)
+}
+         }
+      }
+      ruby {
+         set fdef {class ENVModule
+   def ENVModule.module(*args)}
+         if {[getConf quarantine_support]} {
+            ##nagelfar ignore +7 Too long line
+            append fdef {
+      _mlre = ''
+      if ENV.has_key?('MODULES_RUN_QUARANTINE') then
+         ENV['MODULES_RUN_QUARANTINE'].split(' ').each do |_mlv|
+            if _mlv =~ /^[A-Za-z_][A-Za-z0-9_]*$/ then
+               if ENV.has_key?(_mlv) then
+                  _mlre << "__MODULES_QUAR_" + _mlv + "='" + ENV[_mlv].to_s + "' "
+               end
+               _mlrv = 'MODULES_RUNENV_' + _mlv
+               _mlre << _mlv + "='" + ENV[_mlrv].to_s + "' "
+            end
+         end
+         unless _mlre.empty?
+            _mlre = 'env ' + _mlre + '__MODULES_QUARANTINE_SET=1 '
+         end
+      end}
+         }
+         append fdef {
+      if args[0].kind_of?(Array) then
+         args = args[0]
+      end
+      if args.length == 0 then
+         args = ''
+      else
+         args = "\"#{args.join('" "')}\""
+      end
+      _mlstatus = true}
+         if {[getConf quarantine_support]} {
+            ##nagelfar ignore +2 Suspicious # char
+            append fdef "\n      eval `#{_mlre}$tclshbin '$::argv0' ruby\
+               #{args}`\n"
+         } else {
+            append fdef "\n      eval `$tclshbin '$::argv0' ruby #{args}`\n"
+         }
+         append fdef {      return _mlstatus
+   end}
+         if {[getConf ml]} {
+            append fdef {
+   def ENVModule.ml(*args)
+      return ENVModule.module('ml', *args)
+   end}
+         }
+         append fdef {
+end}
+      }
+      lisp {
+         reportErrorAndExit {lisp mode autoinit not yet implemented}
+      }
+      cmake {
+         if {[getConf quarantine_support]} {
+            set pre_exec "\n      execute_process(COMMAND \${_mlre} $tclshbin\
+            \"$::argv0\" cmake "
+         } else {
+            set pre_exec "\n      execute_process(COMMAND $tclshbin\
+            \"$::argv0\" cmake "
+         }
+         set post_exec "\n         OUTPUT_FILE \${tempfile_name})\n"
+         set fdef {function(module)
+   cmake_policy(SET CMP0007 NEW)}
+         if {[getConf quarantine_support]} {
+            append fdef {
+   set(_mlre "")
+   if(DEFINED ENV{MODULES_RUN_QUARANTINE})
+      string(REPLACE " " ";" _mlv_list "$ENV{MODULES_RUN_QUARANTINE}")
+      foreach(_mlv ${_mlv_list})
+         if(${_mlv} MATCHES "^[A-Za-z_][A-Za-z0-9_]*$")
+            if(DEFINED ENV{${_mlv}})
+               set(_mlre "${_mlre}__MODULES_QUAR_${_mlv}=$ENV{${_mlv}};")
+            endif()
+            set(_mlrv "MODULES_RUNENV_${_mlv}")
+            set(_mlre "${_mlre}${_mlv}=$ENV{${_mlrv}};")
+        endif()
+      endforeach()
+      if (NOT "${_mlre}" STREQUAL "")
+         set(_mlre "env;${_mlre}__MODULES_QUARANTINE_SET=1;")
+      endif()
+   endif()}
+         }
+         append fdef {
+   set(_mlstatus TRUE)
+   execute_process(COMMAND mktemp -t moduleinit.cmake.XXXXXXXXXXXX
+      OUTPUT_VARIABLE tempfile_name
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+   if(${ARGC} EQUAL 1)}
+            # adapt command definition depending on the number of args to be
+            # able to pass to some extend (<5 args) empty string element to
+            # modulecmd (no other way as empty element in ${ARGV} are skipped
+            append fdef "$pre_exec\"\${ARGV0}\"$post_exec"
+            append fdef {   elseif(${ARGC} EQUAL 2)}
+            append fdef "$pre_exec\"\${ARGV0}\" \"\${ARGV1}\"$post_exec"
+            append fdef {   elseif(${ARGC} EQUAL 3)}
+            append fdef "$pre_exec\"\${ARGV0}\" \"\${ARGV1}\"\
+               \"\${ARGV2}\"$post_exec"
+            append fdef {   elseif(${ARGC} EQUAL 4)}
+            append fdef "$pre_exec\"\${ARGV0}\" \"\${ARGV1}\"\
+               \"\${ARGV2}\" \"\${ARGV3}\"$post_exec"
+            append fdef {   else()}
+            append fdef "$pre_exec\${ARGV}$post_exec"
+            append fdef {   endif()
+   if(EXISTS ${tempfile_name})
+      include(${tempfile_name})
+      file(REMOVE ${tempfile_name})
+   endif()
+   set(module_result ${_mlstatus} PARENT_SCOPE)
+endfunction(module)}
+         if {[getConf ml]} {
+            append fdef {
+function(ml)
+   module(ml ${ARGV})
+   set(module_result ${module_result} PARENT_SCOPE)
+endfunction(ml)}
+         }
+      }
+      r {
+         set fdef "module <- function(...){"
+         if {[getConf quarantine_support]} {
+            ##nagelfar ignore +7 Too long line
+            append fdef {
+   mlre <- ''
+   if (!is.na(Sys.getenv('MODULES_RUN_QUARANTINE', unset=NA))) {
+      for (mlv in strsplit(Sys.getenv('MODULES_RUN_QUARANTINE'), ' ')[[1]]) {
+         if (grepl('^[A-Za-z_][A-Za-z0-9_]*$', mlv)) {
+            if (!is.na(Sys.getenv(mlv, unset=NA))) {
+               mlre <- paste0(mlre, "__MODULES_QUAR_", mlv, "='", Sys.getenv(mlv), "' ")
+            }
+            mlrv <- paste0('MODULES_RUNENV_', mlv)
+            mlre <- paste0(mlre, mlv, "='", Sys.getenv(mlrv), "' ")
+         }
+      }
+      if (mlre != '') {
+         mlre <- paste0('env ', mlre, '__MODULES_QUARANTINE_SET=1 ')
+      }
+   }}
+         }
+         append fdef {
+   arglist <- as.list(match.call())
+   arglist[1] <- 'r'
+   args <- paste0('"', paste0(arglist, collapse='" "'), '"')}
+         if {[getConf quarantine_support]} {
+            append fdef "\n   cmd <- paste(mlre, '$tclshbin', '\"$::argv0\"',\
+               args, sep=' ')\n"
+         } else {
+            append fdef "\n   cmd <- paste('$tclshbin', '\"$::argv0\"', args,\
+               sep=' ')\n"
+         }
+         append fdef {   mlstatus <- TRUE
+   hndl <- pipe(cmd)
+   eval(expr = parse(file=hndl))
+   close(hndl)
+   invisible(mlstatus)}
+         append fdef "\n}"
+         if {[getConf ml]} {
+            append fdef {
+ml <- function(...){
+   module('ml', ...)
+}}
+         }
+      }
+   }
+
+   # output function definition
+   lappend ::g_shcode_out $fdef
+}
+
+proc get-env {var {valifunset {}}} {
+   if {[isEnvVarDefined $var] && ![isEnvVarCleared $var]} {
+      return $::env($var)
+   } else {
+      return $valifunset
+   }
+}
+
+proc envVarEquals {var_name value} {
+   return [expr {[isEnvVarDefined $var_name] && [get-env $var_name]\
+      eq $value}]
+}
+
+proc isEnvVarDefined {var_name} {
+   return [info exists ::env($var_name)]
+}
+
+proc setEnvVarIfUndefined {var_name value} {
+   if {![isEnvVarDefined $var_name]} {
+      set ::env($var_name) $value
+   }
+}
+
+proc set-env {var val} {
+   set mode [currentState mode]
+   reportDebug "$var=$val"
+
+   if {![isEnvVarProtected $var]} {
+      # an empty string value means unsetting variable on Windows platform, so
+      # call unset-env to ensure variable will not be seen defined yet raising
+      # an error when trying to access it
+      if {[getState is_win] && $val eq {}} {
+         unset-env $var
+      } else {
+         interp-sync-env set $var $val
+
+         unsetEnvVarAsCleared $var
+
+         # propagate variable setup to shell environment on load and unload
+         # mode
+         if {$mode eq {load} || $mode eq {unload}} {
+            set ::g_stateEnvVars($var) new
+         }
+      }
+   } else {
+      reportWarning "Modification of protected environment variable $var\
+         ignored"
+   }
+}
+
+proc isEnvVarProtected {var_name} {
+   return [expr {$var_name in [split [getConf protected_envvars] :]}]
+}
+
+proc reset-to-unset-env {var {val {}}} {
+   interp-sync-env set $var $val
+   # set var as cleared if val is empty
+   if {$val eq {}} {
+      setEnvVarAsCleared $var
+   }
+}
+
+proc setEnvVarAsCleared {var_name} {
+   set ::g_clearedEnvVars($var_name) 1
+}
+
+proc unsetEnvVarAsCleared {var_name} {
+   if {[isEnvVarCleared $var_name]} {
+      unset ::g_clearedEnvVars($var_name)
+   }
+}
+
+proc isEnvVarCleared {var_name} {
+   return [info exists ::g_clearedEnvVars($var_name)]
+}
+
+proc unset-env {var {internal 0} {val {}}} {
+   set mode [currentState mode]
+   reportDebug "$var (internal=$internal, val=$val)"
+
+   if {![isEnvVarProtected $var]} {
+      # clear value instead of unset it not to break variable later reference
+      # in modulefile. clear whether variable set or not to get a later usage
+      # consistent behavior whatever env is setup
+      if {!$internal} {
+         reset-to-unset-env $var $val
+      # internal variables (like ref counter var) are purely unset if they
+      # exists
+      } elseif {[isEnvVarDefined $var]} {
+         interp-sync-env unset $var
+         set intwasset 1
+      }
+
+      # propagate deletion in any case if variable is public and for internal
+      # one only if variable was set
+      if {($mode eq {load} || $mode eq {unload}) && (!$internal ||\
+         [info exists intwasset])} {
+         set ::g_stateEnvVars($var) del
+      }
+   } else {
+      reportWarning "Modification of protected environment variable $var\
+         ignored"
+   }
+}
+
+proc getPushenvVarName {var} {
+   return __MODULES_PUSHENV_${var}
+}
+
+proc getModshareVarName {var} {
+   # no modshare variable for Modules-specific path variables as each entry
+   # should be unique (no reference counting mechanism for these variables
+   # expect for MODULEPATH)
+   if {$var in {_LMFILES_ LOADEDMODULES} || [string equal -length 10\
+      __MODULES_ $var] || [string equal -length 8 MODULES_ $var]} {
+      return {}
+   # specific modshare variable use a Modules-specific prefix (rather suffix
+   # that may lead to warning message for instance for DYLD-related variables)
+   } else {
+      return __MODULES_SHARE_${var}
+   }
+}
+
+# path fiddling
+proc getReferenceCountArray {var separator} {
+   # get reference counter set in environment
+   set sharevar [getModshareVarName $var]
+   array set refcount {}
+   if {[isEnvVarDefined $sharevar]} {
+      set modsharelist [psplit $::env($sharevar) [getState path_separator]]
+      # ignore environment ref count variable if malformed
+      if {([llength $modsharelist] % 2) == 0} {
+         array set refcount $modsharelist
+      } else {
+         reportDebug "Reference counter value in '$sharevar' is malformed\
+            ($modsharelist)"
+      }
+   }
+
+   array set countarr {}
+   if {[isEnvVarDefined $var]} {
+      # do not skip a bare empty path entry that can also be found in
+      # reference counter array (sometimes var is cleared by setting it
+      # empty not unsetting it, ignore var in this case)
+      if {$::env($var) eq {} && [info exists refcount()]} {
+         lappend eltlist {}
+      } else {
+         set eltlist [split $::env($var) $separator]
+      }
+
+      # just go thought the elements of the variable, which means additional
+      # elements part of the reference counter variable will be ignored
+      foreach elt $eltlist {
+         # no reference counter, means value has been set once
+         if {![info exists refcount($elt)]} {
+            set count 1
+         # bad reference counter value is ignored
+         } elseif {![string is digit -strict $refcount($elt)] ||\
+            $refcount($elt) < 1} {
+            reportDebug "Reference counter value for '$elt' in '$sharevar' is\
+               erroneous ($refcount($elt))"
+            set count 1
+         } else {
+            set count $refcount($elt)
+         }
+         set countarr($elt) $count
+      }
+   }
+
+   set count_list [array get countarr]
+   reportDebug "(var=$var, delim=$separator) got '$count_list'"
+
+   return $count_list
+}
+
+proc isReferenceCountPathDefined {var path separator} {
+   array set ref_count_arr [getReferenceCountArray $var $separator]
+   return [info exists ref_count_arr($path)]
+}
+
+# generate reference count value to export in user environment
+proc setReferenceCountRecordValue {sharevar countlist} {
+   foreach {elt refcount} $countlist {
+      # do not export elements with a reference count of 1 as no reference
+      # count entry means a reference count of 1
+      # exception made for empty string which is recorded even for a single
+      # reference count to be able to distinguish between an empty path
+      # variable and a path variable with an empty string as unique element
+      if {$refcount > 1 || $elt eq {}} {
+         lappend reclist $elt $refcount
+      }
+   }
+
+   if {[info exists reclist]} {
+      set-env $sharevar [pjoin $reclist [getState path_separator]]
+   # unset ref count var if found set whereas no counter should be recorded
+   } elseif {[isEnvVarDefined $sharevar]} {
+      unset-env $sharevar 1
+   }
+}
+
+proc unload-path {cmd mode dflbhv args} {
+   reportDebug "($args) cmd=$cmd, mode=$mode, dflbhv=$dflbhv"
+
+   lassign [parsePathCommandArgs $cmd $mode $dflbhv {*}$args] separator\
+      allow_dup idx_val ign_refcount val_set_is_delim glob_match bhv var\
+      path_list
+
+   switch -- $bhv {
+      noop {
+         return [list $bhv $var]
+      }
+      append - prepend {
+         # set paths instead of removing them
+         add-path unload-path load $bhv $cmd $separator $var {*}$path_list
+         return [list $bhv $var]
+      }
+   }
+
+   # clean any previously defined pushenv stack
+   unset-env [getPushenvVarName $var] 1
+
+   # no reference count management when no share variable is returned
+   set isrefcount [expr {[set sharevar [getModshareVarName $var]] ne {}}]
+   if {$isrefcount} {
+      array set countarr [getReferenceCountArray $var $separator]
+   }
+
+   # Don't worry about dealing with this variable if it is already scheduled
+   #  for deletion
+   if {[info exists ::g_stateEnvVars($var)] && $::g_stateEnvVars($var) eq\
+      {del}} {
+      return [list $bhv $var]
+   }
+
+   # save initial variable content to match index arguments
+   set dir_list [split [get-env $var] $separator]
+   # detect if empty env value means empty path entry
+   if {![llength $dir_list] && [info exists countarr()]} {
+      lappend dir_list {}
+   }
+
+   # match glob pattern against existing values
+   if {$glob_match} {
+      set new_path_list [list]
+      foreach glob_pattern $path_list {
+         set pattern_match_list [lsearch -glob -all -inline $dir_list\
+            $glob_pattern]
+         if {[llength $pattern_match_list]} {
+            lappend new_path_list {*}$pattern_match_list
+         }
+      }
+      set path_list $new_path_list
+   }
+
+   # build list of index to remove from variable
+   set del_idx_list [list]
+   foreach dir $path_list {
+      # retrieve dir value if working on an index list
+      if {$idx_val} {
+         set idx $dir
+         # go to next index if this one is not part of the existing range
+         # needed to distinguish an empty value to an out-of-bound value
+         if {$idx < 0 || $idx >= [llength $dir_list]} {
+            continue
+         } else {
+            set dir [lindex $dir_list $idx]
+         }
+      }
+
+      # update reference counter array
+      if {[info exists countarr($dir)]} {
+         # unload value in any case if counter ignored (--ignore-refcount set)
+         if {$ign_refcount} {
+            set countarr($dir) 0
+         } else {
+            incr countarr($dir) -1
+         }
+         if {$countarr($dir) <= 0} {
+            unset countarr($dir)
+            set newcount 0
+         } else {
+            set newcount $countarr($dir)
+         }
+      } else {
+         set newcount 0
+      }
+
+      # get all entry indexes corresponding to dir
+      set found_idx_list [lsearch -all -exact $dir_list $dir]
+
+      # remove all found entries
+      if {$newcount <= 0} {
+         # only remove passed position in --index mode
+         if {$idx_val} {
+            lappend del_idx_list $idx
+         } else {
+            lappend del_idx_list {*}$found_idx_list
+         }
+      # if multiple entries found remove the extra entries compared to new
+      # reference counter
+      } elseif {[llength $found_idx_list] > $newcount} {
+         # only remove passed position in --index mode
+         if {$idx_val} {
+            lappend del_idx_list $idx
+         } else {
+            # delete extra entries, starting from end of the list (on a path
+            # variable, entries at the end have less priority than those at
+            # the start)
+            lappend del_idx_list {*}[lrange $found_idx_list $newcount end]
+         }
+      }
+   }
+
+   # update variable if some element need to be removed
+   if {[llength $del_idx_list]} {
+      set del_idx_list [lsort -integer -unique $del_idx_list]
+      set newpath [list]
+      set nbelem [llength $dir_list]
+      # rebuild list of element without indexes set for deletion
+      for {set i 0} {$i < $nbelem} {incr i} {
+         if {$i ni $del_idx_list} {
+            lappend newpath [lindex $dir_list $i]
+         }
+      }
+   } else {
+      set newpath $dir_list
+   }
+
+   # set env variable and corresponding reference counter in any case
+   if {![llength $newpath]} {
+      unset-env $var
+   } else {
+      set-env $var [join $newpath $separator]
+   }
+
+   if {$isrefcount} {
+      setReferenceCountRecordValue $sharevar [array get countarr]
+   }
+   return [list $bhv $var]
+}
+
+proc add-path {cmd mode dflbhv args} {
+   reportDebug "($args) cmd=$cmd, mode=$mode, dflbhv=$dflbhv"
+
+   # may be called from unload-path where argument parsing was already done
+   if {$cmd eq {unload-path}} {
+      set path_list [lassign $args cmd separator var]
+      set allow_dup 0
+      set ign_refcount 0
+      set val_set_is_delim 0
+      set bhv $dflbhv
+   } else {
+      lassign [parsePathCommandArgs $cmd $mode $dflbhv {*}$args] separator\
+         allow_dup idx_val ign_refcount val_set_is_delim glob_match bhv var\
+         path_list
+   }
+
+   # clean any previously defined pushenv stack
+   unset-env [getPushenvVarName $var] 1
+
+   # no reference count management when no share variable is returned
+   set isrefcount [expr {[set sharevar [getModshareVarName $var]] ne {}}]
+   if {$isrefcount} {
+      array set countarr [getReferenceCountArray $var $separator]
+   }
+
+   if {$bhv eq {prepend}} {
+      set path_list [lreverse $path_list]
+   }
+
+   set val [get-env $var]
+
+   foreach dir $path_list {
+      if {![info exists countarr($dir)] || $allow_dup} {
+         # ignore env var set empty if no empty entry found in reference
+         # counter array (sometimes var is cleared by setting it empty not
+         # unsetting it)
+         if {$val ne {} || [info exists countarr()]} {
+            set sep [expr {$val eq $separator ? {} : $separator}]
+            set val [expr {$bhv eq {prepend} ? "$dir$sep$val" :\
+               "$val$sep$dir"}]
+         } else {
+            set val $dir
+         }
+      }
+      if {[info exists countarr($dir)]} {
+         # do not increase counter if bare separator string is added or if
+         # reference count is ignored (--ignore-refcount set) unless if
+         # duplicate mode is enabled (--duplicates set)
+         if {!$val_set_is_delim && (!$ign_refcount || $allow_dup)} {
+            incr countarr($dir)
+         }
+      } else {
+         set countarr($dir) 1
+      }
+   }
+
+   set-env $var $val
+   if {$isrefcount} {
+      setReferenceCountRecordValue $sharevar [array get countarr]
+   }
+
+   return {}
+}
+
+# analyze argument list passed to a path command to set default value or raise
+# error in case some attributes are missing
+proc parsePathCommandArgs {cmd mode dflbhv args} {
+   # parse argument list
+   set next_is_delim 0
+   set next_is_ignored 0
+   set next_is_reset 0
+   set allow_dup 0
+   set idx_val 0
+   set ign_refcount 0
+   set val_set_is_delim 0
+   set glob_match 0
+   set bhv $dflbhv
+   foreach arg $args {
+      # everything passed after variable name is considered a value
+      if {[info exists var]} {
+         switch -- $arg {
+            --append-on-unload - --prepend-on-unload {
+               if {$cmd ne {remove-path}} {
+                  knerror "invalid option '$arg' for $cmd"
+               } elseif {$mode ne {unload}} {
+                  # ignore value set after this argument if not unloading
+                  # unless if no list is already set for load mode
+                  if {[info exists val_raw_list]} {
+                     set next_is_ignored 1
+                  }
+               } else {
+                  set bhv [expr {$arg eq {--append-on-unload} ? {append} :\
+                     {prepend}}]
+                  # if another argument is set, current value list will be
+                  # withdrawn to start from new list set after this argument
+                  set next_is_reset 1
+               }
+               set bhvopt $arg
+            }
+            --remove-on-unload - --noop-on-unload {
+               if {$cmd ne {remove-path}} {
+                  knerror "invalid option '$arg' for $cmd"
+               } elseif {$mode eq {unload}} {
+                  set bhv [expr {$arg eq {--remove-on-unload} ? {remove} :\
+                     {noop}}]
+               }
+               set bhvopt $arg
+            }
+            default {
+               if {$next_is_reset} {
+                  set next_is_reset 0
+                  set val_raw_list [list $arg]
+               } elseif {!$next_is_ignored} {
+                  # set multiple passed values in a list
+                  lappend val_raw_list $arg
+               }
+            }
+         }
+      } else {
+         switch -glob -- $arg {
+            --index {
+               if {$cmd ne {remove-path}} {
+                  reportWarning "--index option has no effect on $cmd"
+               } else {
+                  set idx_val 1
+               }
+            }
+            --duplicates {
+               # raise warning when option is used by remove-path
+               if {$cmd eq {remove-path}} {
+                  reportWarning "--duplicates option has no effect on $cmd"
+               } else {
+                  set allow_dup 1
+               }
+            }
+            --glob {
+               # raise warning when option is not used by remove-path
+               if {$cmd eq {remove-path}} {
+                  set glob_match 1
+               } else {
+                  reportWarning "--glob option has no effect on $cmd"
+               }
+            }
+            -d - -delim - --delim {
+               set next_is_delim 1
+            }
+            --delim=* {
+               set delim [string range $arg 8 end]
+            }
+            --ignore-refcount {
+               set ign_refcount 1
+            }
+            --append-on-unload - --prepend-on-unload - --remove-on-unload -\
+            --noop-on-unload {
+               if {$cmd ne {remove-path}} {
+                  knerror "invalid option '$arg' for $cmd"
+               } elseif {$mode eq {unload}} {
+                  switch -- [string range $arg 2 5] {
+                     noop { set bhv noop }
+                     remo { set bhv remove }
+                     appe { set bhv append }
+                     prep { set bhv prepend }
+                  }
+               }
+               set bhvopt $arg
+            }
+            -* {
+               knerror "invalid option '$arg' for $cmd"
+            }
+            default {
+               if {$next_is_delim} {
+                  set delim $arg
+                  set next_is_delim 0
+               } else {
+                  set var $arg
+               }
+            }
+         }
+      }
+   }
+
+   # adapt with default value or raise error if some arguments are missing
+   if {![info exists delim]} {
+      set delim [getState path_separator]
+   } elseif {$delim eq {}} {
+      knerror "$cmd should get a non-empty path delimiter"
+   }
+   if {![info exists var]} {
+      knerror "$cmd should get an environment variable name"
+   } elseif {$var eq {}} {
+      knerror "$cmd should get a valid environment variable name"
+   }
+   if {![info exists val_raw_list]} {
+      knerror "$cmd should get a value for environment variable $var"
+   }
+
+   # some options cannot be mixed
+   if {$idx_val != 0 && ([info exists bhvopt] && $bhvopt ne\
+      {--noop-on-unload})} {
+      knerror "--index and $bhvopt options cannot be simultaneously set"
+   }
+   if {$idx_val && $glob_match} {
+      knerror "--index and --glob options cannot be simultaneously set"
+   }
+   if {$glob_match && ([info exists bhvopt] && $bhvopt in\
+      {--append-on-unload --prepend-on-unload})} {
+      knerror "--glob and $bhvopt options cannot be simultaneously set"
+   }
+
+   set nb_path_eq_delim [llength [lsearch -all -exact $val_raw_list $delim]]
+   if {$nb_path_eq_delim && $cmd eq {remove-path}} {
+      knerror "$cmd cannot handle path equals to separator string"
+   } elseif {$nb_path_eq_delim > 1} {
+      knerror "$cmd cannot handle multiple paths equal to separator string"
+   }
+
+   # set list of value to add
+   set val_list [list]
+   foreach val $val_raw_list {
+      # check passed indexes are numbers
+      if {$idx_val && ![string is integer -strict $val]} {
+         knerror "$cmd should get valid number as index value"
+      }
+
+      if {![string length $val]} {
+         lappend val_list {}
+      } elseif {$val eq $delim} {
+         if {[llength $val_raw_list] > 1 || [get-env $var] ne {}} {
+            lappend val_list {}
+         # make separator string appear once in resulting value
+         } elseif {[isReferenceCountPathDefined $var {} $delim]} {
+            lappend val_list {}
+            set allow_dup 1
+         } else {
+            lappend val_list {} {}
+            set val_set_is_delim 1
+            set allow_dup 1
+            set ign_refcount 1
+         }
+      } else {
+         # split passed value with delimiter
+         lappend val_list {*}[split $val $delim]
+      }
+   }
+
+   reportDebug "(delim=$delim, allow_dup=$allow_dup, idx_val=$idx_val,\
+      ign_refcount=$ign_refcount, val_set_is_delim=$val_set_is_delim,\
+      glob_match=$glob_match, bhv=$bhv, var=$var, val=$val_list,\
+      nbval=[llength $val_list])"
+
+   return [list $delim $allow_dup $idx_val $ign_refcount $val_set_is_delim\
+      $glob_match $bhv $var $val_list]
+}
+
+# get list of Modules-specific environment variable in glob form
+proc getModulesEnvVarGlobList {{loaded_ctx 0}} {
+   set envvar_glob_list [list LOADEDMODULES _LMFILES_]
+   # only return list of variables related to module loaded context
+   if {$loaded_ctx} {
+      lappend envvar_glob_list __MODULES_*
+   } else {
+      lappend envvar_glob_list MODULE* __MODULES_* *_module*
+   }
+   return $envvar_glob_list
+}
+
+# ;;; Local Variables: ***
+# ;;; mode:tcl ***
+# ;;; End: ***
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

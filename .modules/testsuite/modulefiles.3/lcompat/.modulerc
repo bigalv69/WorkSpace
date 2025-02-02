@@ -1,0 +1,49 @@
+#%Module
+
+if {[info exists env(TESTSUITE_LCOMPAT)]} {
+    switch -- $env(TESTSUITE_LCOMPAT) {
+        addproprc1 {
+            add-property key value
+        }
+        remproprc1 {
+            remove-property key value
+        }
+        extrc1 {
+            extensions moda/1.0 modb/2.0
+        }
+        pranyrc1 {
+            prereq-any foo/1.0 bar/1.0
+        }
+        reqfull1 {
+            module-alias lcompat/al lcompat/1.4
+            module-version lcompat/1.4 sym default
+        }
+        reqfull2 {
+            module-hide lcompat@1.5:
+        }
+        reqfull3 {
+            module-virtual lcompat/deep/1.4 ./1.4
+            module-alias lcompat/aldeep lcompat/deep/1.4
+            module-version lcompat/deep/1.4 deepsym default
+        }
+        reqfullrc1 {
+            require-fullname
+        }
+        deponrc1 {
+            depends-on foo/1.0
+        }
+        prallrc1 {
+            prereq-all foo/1.0
+        }
+        allorc1 {
+            always-load foo/1.0
+        }
+        familyrc1 {
+            family fam
+        }
+        pushenvrc1 {
+            pushenv FOO val1
+        }
+    }
+}
+

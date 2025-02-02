@@ -1,0 +1,294 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.50-cmds/%M%
+#   Revision:		%I%
+#   First Edition:	1995/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		unload
+#   Modulefiles:	prepend/1.0
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Tests the reverse 'prepend-path' module subcommand for
+#			all allowed shell types.
+#		}C%
+#
+##############################################################################
+
+skip_if_quick_mode
+
+#
+#  Variables. This test forces a module unload command. It will result in the
+#    environment variables "_LMFILES_", "LOADEDMODULES" and "PATH" to
+#    be set up
+#
+
+set module "prepend/2.0"
+set modulefile "$modpath/$module"
+
+set old_path $env(PATH)
+set ts_path "/this/is/the/modules/testsuite"
+set new_path "$ts_path:$old_path"
+
+#
+#  Set up the environment for reversal ...
+#
+
+set env(PATH) "$new_path"
+setenv_loaded_module $module $modulefile
+
+#
+#  For the different shells ...
+#
+
+lappend ans [list set PATH $old_path]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+#
+#  The tests
+#
+
+test_cmd_re "ALL" "unload $module" $ans
+
+#
+# Try the empty string
+#
+
+set module "prepend/0.1"
+set modulefile "$modpath/$module"
+
+set ts_path ""
+set new_path "$ts_path:$old_path"
+
+#
+#  Set up the environment for reversal ...
+#
+
+setenv_path_var PATH $ts_path $old_path
+setenv_loaded_module $module $modulefile
+
+#
+#  For the different shells ...
+#
+
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_PATH]
+lappend ans [list set PATH $old_path]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+
+#
+#  The tests
+#
+
+test_cmd_re "ALL" "unload $module" $ans
+
+#
+# Try just the colon
+#
+
+# bare colon specific tests are handled in 50/631
+
+
+#
+# Try unloading when colon is initially set at beginning of set PATH
+#
+
+set module "prepend/2.0"
+set modulefile "$modpath/$module"
+
+set ts_path "/this/is/the/modules/testsuite::$old_path"
+set new_path ":$old_path"
+
+setenv_path_var PATH /this/is/the/modules/testsuite {} $old_path
+setenv_loaded_module $module $modulefile
+
+set ans [list]
+lappend ans [list set __MODULES_SHARE_PATH :1]
+lappend ans [list set PATH $new_path]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+#
+#  The tests
+#
+
+test_cmd_re "ALL" "unload $module" $ans
+
+
+#
+# Try bad argument list: missing variable name
+#
+
+set module "prepend/0.3"
+set modulefile "$modpath/$module"
+setenv_loaded_module $module $modulefile
+set ts_err [msg_moderr "prepend-path $msg_needenvvarname" {prepend-path } $modulefile 24]
+testouterr_cmd "sh" "unload $module" "ERR" [msg_unload $module $ts_err]
+
+#
+# Try bad argument list: missing variable value
+#
+
+set module "prepend/0.4"
+set modulefile "$modpath/$module"
+setenv_loaded_module $module $modulefile
+set ts_err [msg_moderr "prepend-path $msg_needenvvarval PATH" {prepend-path PATH} $modulefile 24]
+testouterr_cmd "sh" "unload $module" "ERR" [msg_unload $module $ts_err]
+
+#
+# Try bad argument list: empty variable name
+#
+
+set module "prepend/0.5"
+set modulefile "$modpath/$module"
+setenv_loaded_module $module $modulefile
+set ts_err [msg_moderr "prepend-path $msg_validenvvarname" {prepend-path {}} $modulefile 24]
+testouterr_cmd "sh" "unload $module" "ERR" [msg_unload $module $ts_err]
+
+#
+# Try command switches passed after variable name
+#
+
+set module "prepend/1.10"
+set modulefile "$modpath/$module"
+setenv_loaded_module $module $modulefile
+setenv_path_var testsuite --delim=,
+setenv_path_var testsuite2 , foo
+set ans [list]
+lappend ans [list set testsuite2 foo]
+lappend ans [list unset testsuite3]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+lappend ans [list unset testsuite]
+testouterr_cmd_re "sh" "unload $module" $ans {}
+unsetenv_path_var testsuite
+unsetenv_path_var testsuite2
+
+
+
+#
+# Try prepending empty string and check reference counter
+#
+
+set module "prepend/3.0"
+set modulefile "$modpath/$module"
+set env(__MODULES_SHARE_FOO) ":1"
+set env(FOO) ""
+setenv_loaded_module $module $modulefile
+
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_FOO]
+lappend ans [list unset FOO]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+testouterr_cmd "sh" "unload $module" $ans ""
+
+set module2 "prepend/3.1"
+set modulefile2 "$modpath/$module2"
+
+
+set env(__MODULES_SHARE_FOO) ":2"
+set env(FOO) "/path/to/dir:"
+setenv_loaded_module [list $module $module2] [list $modulefile $modulefile2]
+
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_FOO]
+lappend ans [list unset FOO]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+testouterr_cmd "sh" "unload $module $module2" $ans ""
+
+set ans [list]
+lappend ans [list set __MODULES_SHARE_FOO ":1"]
+lappend ans [list set FOO ""]
+lappend ans [list set _LMFILES_ $modulefile]
+lappend ans [list set LOADEDMODULES $module]
+
+testouterr_cmd "sh" "unload $module2" $ans ""
+
+set ans [list]
+lappend ans [list set __MODULES_SHARE_FOO ":1"]
+lappend ans [list set FOO "/path/to/dir:"]
+lappend ans [list set _LMFILES_ $modulefile2]
+lappend ans [list set LOADEDMODULES $module2]
+
+testouterr_cmd "sh" "unload $module" $ans ""
+
+
+set env(__MODULES_SHARE_FOO) ":2"
+set env(FOO) "/path/to/dir:"
+setenv_loaded_module [list $module2 $module] [list $modulefile2 $modulefile]
+
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_FOO]
+lappend ans [list unset FOO]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+testouterr_cmd "sh" "unload $module $module2" $ans ""
+
+set ans [list]
+lappend ans [list set __MODULES_SHARE_FOO ":1"]
+lappend ans [list set FOO ""]
+lappend ans [list set _LMFILES_ $modulefile]
+lappend ans [list set LOADEDMODULES $module]
+
+testouterr_cmd "sh" "unload $module2" $ans ""
+
+set ans [list]
+lappend ans [list set __MODULES_SHARE_FOO ":1"]
+lappend ans [list set FOO "/path/to/dir:"]
+lappend ans [list set _LMFILES_ $modulefile2]
+lappend ans [list set LOADEDMODULES $module2]
+
+testouterr_cmd "sh" "unload $module" $ans ""
+
+
+#
+# Prepend multiple paths passed as one string
+#
+
+set module "prepend/2.3"
+set modulefile "$modpath/$module"
+
+set env(__MODULES_SHARE_FOO) ":1"
+set env(FOO) ":/modules/testsuite2.2:/modules/testsuite2.2/2.2:/path/to/dir1"
+setenv_loaded_module [list $module] [list $modulefile]
+
+set ans [list]
+lappend ans [list unset __MODULES_SHARE_FOO]
+lappend ans [list set FOO "/path/to/dir1"]
+lappend ans [list unset _LMFILES_]
+lappend ans [list unset LOADEDMODULES]
+
+testouterr_cmd "sh" "unload $module" $ans ""
+
+
+#
+# Prepend multiple paths passed as multiple strings
+#
+
+set module "prepend/2.4"
+set modulefile "$modpath/$module"
+
+setenv_loaded_module $module $modulefile
+
+testouterr_cmd "sh" "unload $module" $ans ""
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

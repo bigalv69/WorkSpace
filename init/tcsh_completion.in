@@ -1,0 +1,108 @@
+#
+# Tcsh commandline completion
+#
+
+alias _module_avail '\\
+    @TCLSH@ "@libexecdir@/modulecmd.tcl" tcsh avail --color=never -s -t -S -o "alias:indesym" |& cat'
+
+alias _module_loaded '\\
+    @TCLSH@ "@libexecdir@/modulecmd.tcl" tcsh list --color=never -s -t -o "" |& cat'
+
+alias _module_savelist '\\
+    @TCLSH@ "@libexecdir@/modulecmd.tcl" tcsh savelist --color=never -s -t |& sed '"'"'\\
+        /No named collection\.$/d; \\
+        /Named collection list$/d; \\
+        /:$/d; '"'"
+
+alias _module_stashlist '\\
+    @TCLSH@ "@libexecdir@/modulecmd.tcl" tcsh stashlist --color=never -s -t |& sed '"'"'\\
+        /No stash collection\.$/d; \\
+        /Stash collection list$/d; \\
+        /:$/d; '"'"
+
+alias _module_not_yet_loaded '\\
+        mkfifo /tmp/modules_tcsh_completion.$$.p1 /tmp/modules_tcsh_completion.$$.p2 && \\
+        ( _module_avail | sort >! /tmp/modules_tcsh_completion.$$.p1 & ); \\
+        ( _module_loaded | sort >! /tmp/modules_tcsh_completion.$$.p2 & ); \\
+        comm -23 /tmp/modules_tcsh_completion.$$.p1 /tmp/modules_tcsh_completion.$$.p2; \\
+        \rm /tmp/modules_tcsh_completion.$$.p1 /tmp/modules_tcsh_completion.$$.p2'
+
+alias _module_modulepath 'echo ${MODULEPATH} | sed '"'"'s/:/\n/g;'"'"' '
+
+complete module 'n/help/`_module_avail`/' \
+        'n/add/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/load/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/add-any/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/load-any/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/try-add/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/try-load/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/rm/`_module_loaded; echo "@comp_unload_opts@"`/' \
+        'n/del/`_module_loaded; echo "@comp_unload_opts@"`/' \
+        'n/remove/`_module_loaded; echo "@comp_unload_opts@"`/' \
+        'n/unload/`_module_loaded; echo "@comp_unload_opts@"`/' \
+        'n/swap/`_module_loaded; echo "@comp_load_opts@"`/' \
+        'N/swap/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/switch/`_module_loaded; echo "@comp_load_opts@"`/' \
+        'N/switch/`_module_not_yet_loaded; echo "@comp_load_opts@"`/' \
+        'n/show/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        'n/display/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        'n/test/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        "n/list/(@comp_list_opts@)/" \
+        'n/avail/`_module_avail; echo "@comp_avail_opts@"`/' \
+        'n/is-avail/`_module_avail; echo "@comp_isavail_opts@"`/' \
+        'n/is-loaded/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        'n/info-loaded/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        'n/restore/`_module_savelist`/' \
+        "n/savelist/(@comp_list_opts@)/" \
+        'n/saveshow/`_module_savelist`/' \
+        'n/saverm/`_module_savelist`/' \
+        'n/save/`_module_savelist`/' \
+        'n/is-saved/`_module_savelist`/' \
+        "n/aliases/(@comp_aliases_opts@)/" \
+        'n/use/d/' \
+        'N/use/d/' \
+        'n/unuse/`_module_modulepath`/' \
+        'n/is-used/`_module_modulepath`/' \
+        'n/purge/n/' \
+        'n/refresh/n/' \
+        'n/reload/n/' \
+        'n/whatis/`_module_avail; echo "@comp_whatis_opts@"`/' \
+        "n/apropos/(@comp_search_opts@)/" \
+        "n/search/(@comp_search_opts@)/" \
+        "n/keyword/(@comp_search_opts@)/" \
+        'n/paths/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        'n/path/`_module_avail; echo "@comp_mfile_opts@"`/' \
+        'n/edit/`_module_avail`/' \
+        'n/sh-to-mod/n/' \
+        'n/source/n/' \
+        'n/initadd/n/' \
+        'n/initprepend/n/' \
+        'n/initrm/n/' \
+        'n/initlist/n/' \
+        'n/initclear/n/' \
+        "n/append-path/(@comp_path_opts@)/" \
+        "n/prepend-path/(@comp_path_opts@)/" \
+        "n/remove-path/(@comp_rm_path_opts@)/" \
+        "n/clear/(@comp_clear_opts@)/" \
+        "n/config/(@comp_config_opts@)/" \
+        "n/state/n/" \
+        'n/lint/`_module_avail; echo "@comp_lint_opts@"`/' \
+        'n/mod-to-sh/`_module_not_yet_loaded; echo "@comp_modtosh_opts@"`/' \
+        "n/reset/n/" \
+        "n/stash/n/" \
+        "n/stashclear/n/" \
+        "n/stashlist/(@comp_stashlist_opts@)/" \
+        'n/stashpop/`_module_stashlist`/' \
+        'n/stashrm/`_module_stashlist`/' \
+        'n/stashshow/`_module_stashlist`/' \
+        'n/cachebuild/d/' \
+        'N/cachebuild/d/' \
+        "n/cacheclear/n/" \
+        "n/--reset/(@comp_config_opts@)/" \
+        'n/-h/n/' \
+        'n/--help/n/' \
+        'n/-V/n/' \
+        'n/--version/n/' \
+        'C/sw*/(switch)/' \
+        "p/1/(@comp_cmds@ @comp_opts@)/" \
+        "n/-*/(@comp_cmds@)/"

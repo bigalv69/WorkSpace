@@ -1,0 +1,502 @@
+##########################################################################
+
+# CACHE.TCL, cache management procedures
+# Copyright (C) 2022 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+# Get full path name of module cache file for given modulepath
+proc getModuleCacheFilename {modpath} {
+   return $modpath/.modulecache
+}
+
+# test if a given file path has a limited access by check permission mode set
+# for others
+proc isFileAccessLimited {fpath isdir} {
+   # check if file stat info can be fetched
+   if {[file readable $fpath]} {
+      # extract permissions for "other"
+      set other_perms [string index [file attributes $fpath -permissions] end]
+      # test file can be read by other: o+r right, which means file should at
+      # least have 0b100 mode, which can be binary-compared against 0b011 (3)
+      # if file is a directory, test it can also be searched: o+x right, which
+      # means dir should at least have 0b101 mode, which can be compared
+      # against 0b010 (2)
+      set perms_mask [expr {$isdir ? {2} : {3}}]
+      set ret [expr {($other_perms | $perms_mask) != 7}]
+   } else {
+      set ret 1
+   }
+   return $ret
+}
+
+# walk through directory content and return every files and dirs with limited
+# access rights
+proc getLimitedAccessesInDirectory {modpath} {
+   # cannot test limited accesses on Windows platform
+   if {[getState is_win]} {
+      return {}
+   }
+
+   foreach igndir [getConf ignored_dirs] {
+      set ignored_dirs($igndir) 1
+   }
+   # walk through directory to find elements with limited access
+   array set limited_arr {}
+   lappend full_list $modpath
+   for {set i 0} {$i < [llength $full_list]} {incr i 1} {
+      set elt [lindex $full_list $i]
+      set elttail [file tail $elt]
+      set eltname [getModuleNameFromModulepath $elt $modpath]
+      if {[file isdirectory $elt]} {
+         # skip ignored dirs
+         if {![info exists ignored_dirs($elttail)]} {
+            if {[isFileAccessLimited $elt 1]} {
+               set limited_arr($eltname) d
+            # only walk through directory content if its access is not limited
+            } else {
+               # get all elements found in directory (regular and dot files)
+               set direlt_list [glob -nocomplain $elt/*]
+               foreach eltindir [glob -nocomplain -types hidden -directory\
+                  $elt -tails *] {
+                  if {$eltindir ni {. ..}} {
+                     lappend direlt_list $elt/$eltindir
+                  }
+               }
+               if {[llength $direlt_list] > 0} {
+                  lappend full_list {*}$direlt_list
+               }
+            }
+         }
+      } else {
+         # skip ignored files
+         switch -glob -- $elttail {
+            *~ - *,v - \#*\# {}
+            default {
+               if {[isFileAccessLimited $elt 0]} {
+                  set limited_arr($eltname) f
+               }
+            }
+         }
+      }
+   }
+
+   # filter .version/.modulecache files found at the root of modulepath dir
+   foreach elt [list .version .modulecache] {
+      if {[info exists limited_arr($elt)]} {
+         unset limited_arr($elt)
+      }
+   }
+
+   reportDebug "found [array names limited_arr] ([array size limited_arr])\
+      with limited access"
+   return [array get limited_arr]
+}
+
+# Build cache file content for given modulepath
+proc formatModuleCacheContent {modpath} {
+   set content {}
+   # collect files from modulepath directory
+   array set found_list [findModules $modpath * 0 1]
+
+   # collect files and dirs from modulepath directory with limited access
+   array set limited_list [getLimitedAccessesInDirectory $modpath]
+
+   # concatenate element found and those with limited access as the second
+   # kind may not be part of found list
+   set elt_list [lsort -unique [concat [array names found_list] [array names\
+      limited_list]]]
+
+   # build cache entry for every file found
+   foreach elt $elt_list {
+      # ignore element if it has been flagged in skip list (one of its parent
+      # directory has limited access) or if modulepath has itself a limited
+      # access
+      if {[info exists skip_list($elt)] || $elt eq {}} {
+         continue
+      }
+
+      set entry_list [list]
+      set fetch_content 0
+
+      # mention in cache that file or directory has limited access to test if
+      # they can be accessed by user when cache is evaluated
+      if {[info exists limited_list($elt)]} {
+         if {$limited_list($elt) eq {d}} {
+            # mark all elements contained in dir to skip them as their parent
+            # directory has limited access (due to lsort on foreach loop we
+            # are assured to treat parent dir before the entries it contains)
+            foreach elttoskip [array names found_list -glob $elt/*] {
+               set skip_list($elttoskip) 1
+            }
+            lappend entry_list limited-access-directory $elt
+         } else {
+            lappend entry_list limited-access-file $elt
+         }
+      } else {
+         switch -- [lindex $found_list($elt) 0] {
+            modulerc {
+               lappend entry_list modulerc-content $elt
+               set fetch_content 1
+            }
+            modulefile {
+               lappend entry_list modulefile-content $elt [lindex\
+                  $found_list($elt) 1]
+               set fetch_content 1
+            }
+            default {
+               # also record obtained error to get all the information to
+               # cover everything fetched by findModules. only modulefile
+               # validity is checked in findModules
+               lappend entry_list modulefile-invalid $elt {*}[lrange\
+                  $found_list($elt) 0 1]
+            }
+         }
+      }
+      # fetch file content
+      if {$fetch_content} {
+         if {[catch {
+            set fcontent [readFile $modpath/$elt]
+            # extract module header from the start of the file
+            if {![regexp {^#%Module[0-9\.]*} [string range $fcontent 0 32]\
+               fheader]} {
+               set fheader {}
+            }
+            lappend entry_list $fheader $fcontent
+         } errMsg]} {
+            # rethrow read error after parsing message
+            knerror [parseAccessIssue $modpath/$elt]
+         }
+      }
+      # format cache entry
+      append content "\n$entry_list"
+   }
+
+   # prepend header if some content has been generated
+   if {[string length $content] != 0} {
+      regexp {^\d+\.\d+} {@MODULES_RELEASE@} majmin
+      set content "#%Module$majmin$content"
+   }
+
+   return $content
+}
+
+# read a cache file
+proc readCacheContent {cachefile} {
+   set res {}
+   if {[catch {
+      # read full file
+      set fid [open $cachefile r]
+      # use defined buffer size to limit number of read system call
+      fconfigure $fid -buffersize [getConf cache_buffer_bytes]
+      set fdata [read $fid]
+      close $fid
+      # extract magic cookie (first word of cache file)
+      set fh [string trimright [lindex [split [string range $fdata 0 32]]\
+         0] #]
+      set fhvers [string range $fh 8 end]
+   } errMsg ]} {
+      reportError [parseAccessIssue $cachefile]
+   } else {
+      # check cache validity
+      if {![string equal -length 8 $fh {#%Module}]} {
+         reportInternalBug {Magic cookie '#%Module' missing} $cachefile\
+            {Cache ERROR}
+      # check if version requirement is present
+      } elseif {[string length $fh] <= 8} {
+         reportInternalBug {Modules version requirement missing} $cachefile\
+            {Cache ERROR}
+      # check if min version requirement is met
+      } elseif {[versioncmp {@MODULES_RELEASE@} $fhvers] <0} {
+         reportInternalBug "Cache file requires at least Modules version\
+            $fhvers" $cachefile {Cache ERROR}
+      } else {
+         # set file content as result
+         set res $fdata
+      }
+   }
+   return $res
+}
+
+# evaluate cache file
+proc execute-cachefile {cachefile modpath} {
+   # register current modulepath for cachefile commands to know where they are
+   lappendState modulepath $modpath
+   lappendState debug_msg_prefix "\[cache:$cachefile\] "
+
+   # initialize cache gathering structures for modulepath
+   set ::g_cacheModpath($modpath) {}
+   set ::g_cacheFLimitedModpath($modpath) {}
+   set ::g_cacheDLimitedModpath($modpath) {}
+
+   # initialize cache file evaluation interp configuration
+   if {![info exists ::g_cachefileUntrackVars]} {
+      # list variable that should not be tracked for saving
+      array set ::g_cachefileUntrackVars [list ModulesCurrentCachefile 1\
+         cachecontent 1 env 1]
+
+      # commands that should be renamed before aliases setup
+      array set ::g_cachefileRenameCmds [list]
+
+      # list interpreter alias commands to define
+      array set ::g_cachefileAliases [list modulefile-content\
+         modulefile-content modulerc-content modulerc-content\
+         modulefile-invalid modulefile-invalid limited-access-file\
+         limited-access-file limited-access-directory\
+         limited-access-directory reportInternalBug reportInternalBug\
+         readCacheContent readCacheContent formatErrStackTrace\
+         formatErrStackTrace]
+
+      # alias commands where an argument should be passed
+      array set ::g_cachefileAliasesPassArg [list]
+
+      # trace commands that should be associated to aliases
+      array set ::g_cachefileAliasesTraces [list]
+
+   }
+   set itrp __cachefile
+
+   reportTrace '$cachefile' {Evaluate cache file}
+   # create cachefile interpreter at first interpretation
+   if {![interp exists $itrp]} {
+      reportDebug "creating interp $itrp"
+      interp create $itrp
+
+      # dump initial interpreter state to restore it before each cachefile
+      # interpretation.
+      dumpInterpState $itrp g_cachefileVars g_cachefileArrayVars\
+         g_cachefileUntrackVars g_cachefileProcs
+
+      # interp has just been created
+      set fresh 1
+   } else {
+      set fresh 0
+   }
+
+   # reset interp state command before each interpretation
+   resetInterpState $itrp $fresh g_cachefileVars g_cachefileArrayVars\
+      g_cachefileUntrackVars g_cachefileProcs g_cachefileAliases\
+      g_cachefileAliasesPassArg g_cachefileAliasesTraces\
+      g_cachefileRenameCmds g_cachefileCommands
+
+   # reset modulefile-specific variable before each interpretation
+   interp eval $itrp set ::ModulesCurrentCachefile "{$cachefile}"
+
+   # evaluate cache file
+   ##nagelfar ignore +4 Suspicious # char
+   set exec_res [interp eval $itrp {
+      set cachecontent [readCacheContent $::ModulesCurrentCachefile]
+      if {$cachecontent eq {}} {
+         # simply skip cache file, no exit on error here
+         return 0
+      }
+
+      info script $::ModulesCurrentCachefile
+      if {[catch {eval $cachecontent} errorMsg]} {
+         # format stack trace to report cachefile information only
+         reportInternalBug [formatErrStackTrace $::errorInfo\
+            $::ModulesCurrentCachefile [list {*}[info procs] {*}[info\
+            commands]]] {} {Cache ERROR}
+         return 0
+      } else {
+         return 1
+      }
+   }]
+
+   reportDebug "exiting $cachefile (result=$exec_res)"
+
+   lpopState debug_msg_prefix
+   lpopState modulepath
+
+   return $exec_res
+}
+
+# cache file command to record modulefile content
+proc modulefile-content {mod mtime header content} {
+   set modfile [currentState modulepath]/$mod
+
+   # record modulefile information in memory structures
+   set ::g_modfileContent($modfile) [list $header $content]
+   set ::g_fileMtime($modfile) $mtime
+   set ::g_modfileValid($modfile) [list true {}]
+
+   # gather all modulefiles/modulercs of a modulepath in a global variable
+   # with same information structure than findModules result
+   lappend ::g_cacheModpath([currentState modulepath]) $mod [list modulefile\
+      $mtime $modfile]
+}
+
+# cache file command to record modulerc content
+proc modulerc-content {modrc header content} {
+   set modrcfile [currentState modulepath]/$modrc
+
+   # record modulerc information in memory structures
+   set ::g_modfileContent($modrcfile) [list $header $content]
+
+   # gather all modulefiles/modulercs of a modulepath in a global variable
+   # with same information structure than findModules result
+   lappend ::g_cacheModpath([currentState modulepath]) $modrc [list modulerc]
+}
+
+# cache file command to record an invalid modulefile
+proc modulefile-invalid {mod type msg} {
+   set modfile [currentState modulepath]/$mod
+
+   # record modulefile information in memory structures
+   set ::g_modfileValid($modfile) [list $type $msg]
+
+   # also gather all invalid modulefiles of a modulepath in a global variable
+   # with same information structure than findModules result
+   lappend ::g_cacheModpath([currentState modulepath]) $mod [list $type $msg\
+      $modfile]
+}
+
+# gather modulepath limited access files in specific structure
+proc limited-access-file {mod} {
+   lappend ::g_cacheFLimitedModpath([currentState modulepath]) $mod 1
+}
+
+# gather modulepath limited access files in specific structure
+proc limited-access-directory {dir} {
+   lappend ::g_cacheDLimitedModpath([currentState modulepath]) $dir 1
+}
+
+# finds all module-related files matching mod in the modulepath dir by looking
+# into the cache file
+proc findModulesInCacheFile {modpath mod depthlvl fetch_mtime} {
+   set cachefile [getModuleCacheFilename $modpath]
+
+   # check if cache should be ignored
+   if {[getConf ignore_cache]} {
+      return [list 0 {}]
+   }
+
+   # check if a cache file is available (exist, readable and not expired)
+   if {![info exists ::g_cachefilesAvail($cachefile)]} {
+      if {[file readable $cachefile]} {
+         reportDebug "cache file '$cachefile' exists and is readable"
+         # check expiry if enabled
+         if {[set expiry_secs [getConf cache_expiry_secs]] != 0} {
+            set cachemtime [getFileMtime $cachefile]
+            # cache is also considered expired if its mtime cannot be fetched
+            set ::g_cachefilesAvail($cachefile) [expr {$cachemtime ne {} &&\
+               $expiry_secs > ([getState clock_seconds] - $cachemtime)}]
+            if {!$::g_cachefilesAvail($cachefile)} {
+               reportDebug "cache file '$cachefile' has expired"
+            }
+         } else {
+            set ::g_cachefilesAvail($cachefile) 1
+         }
+      } else {
+         reportDebug "cache file '$cachefile' cannot be found or read"
+         set ::g_cachefilesAvail($cachefile) 0
+      }
+   }
+
+   # return if no cache file available
+   if {!$::g_cachefilesAvail($cachefile)} {
+      return [list 0 {}]
+   }
+
+   # evaluate cache file if not yet done
+   if {![info exists ::g_cachefilesSourced($cachefile)]} {
+      set exec_res [execute-cachefile $cachefile $modpath]
+      # keep track of already sourced cache files not to run them again
+      set ::g_cachefilesSourced($cachefile) $exec_res
+   } else {
+      reportDebug "cache file '$cachefile' has already been evaluated"
+   }
+
+   # return if cache file has not been correctly sourced
+   if {!$::g_cachefilesSourced($cachefile)} {
+      return [list 0 {}]
+   }
+
+   # tailor cache file content to what is requested
+   array set cache_arr $::g_cacheModpath($modpath)
+   reportDebug "[array size cache_arr] elements are cached for '$modpath'"
+   array set flimited_arr $::g_cacheFLimitedModpath($modpath)
+   reportDebug "[array size flimited_arr] limited access files for '$modpath'"
+   array set dlimited_arr $::g_cacheDLimitedModpath($modpath)
+   reportDebug "[array size dlimited_arr] limited access dirs for '$modpath'"
+
+   # filter entries unless all are requested
+   set findall [expr {$mod in {{} *}}]
+   defineModEqStaticProc [isIcase] [getConf extended_default] $mod
+   if {!$findall || $depthlvl > 0} {
+      foreach elt [array names cache_arr] {
+         set eltroot [lindex [file split $elt] 0]
+         set eltdepthlvl [llength [file split $elt]]
+         set elttail [file tail $elt]
+         set eltparent [file dirname $elt]
+
+         # exclude if not matching mod pattern (which is always a root name)
+         if {$eltroot ne {.modulerc} && !$findall && ![modEqStatic $eltroot\
+            match]} {
+            unset cache_arr($elt)
+         # also exclude if not corresponding to search depth level (or if one
+         # modulefile has already been added for directories lying at other
+         # depth level)
+         } elseif {$depthlvl > 0 && $elttail ne {.modulerc} && $eltdepthlvl\
+            != $depthlvl && [info exists modfile_indir($eltparent)]} {
+            unset cache_arr($elt)
+         } else {
+            # track a valid non-hidden modulefile has been added in parent
+            # directory
+            if {[string index $elttail 0] ne {.} && ![info exists\
+               modfile_indir($eltparent)] && [lindex $cache_arr($elt) 0] eq\
+               {modulefile}} {
+               set modfile_indir($eltparent) 1
+            }
+         }
+      }
+   }
+
+   array set hidden_list {}
+   set limited_list [list]
+   # add limited access files and directories to result if they match query
+   foreach elt [concat [array names flimited_arr] [array names\
+      dlimited_arr]] {
+      set eltroot [lindex [file split $elt] 0]
+      if {$eltroot eq {.modulerc} || $findall || [modEqStatic $eltroot\
+         match]} {
+         set fpelt [file join $modpath $elt]
+         lappend limited_list $fpelt
+         # indicate file is hidden in structure that will be transmitted to
+         # findModulesFromDirsAndFiles for no-indepth module search
+         if {[string index [file tail $elt] 0] eq {.} && [info exists\
+            flimited_arr($elt)]} {
+            set hidden_list($fpelt) 1
+         }
+      }
+   }
+
+   # walk through list of matching limited access dirs and files to find
+   # modules available to current user (transmit list of known files and dirs
+   # to avoid file stat tests)
+   findModulesFromDirsAndFiles $modpath $limited_list $depthlvl $fetch_mtime\
+      cache_arr modfile_indir hidden_list flimited_arr dlimited_arr
+
+   reportDebug "found [array names cache_arr] ([array size cache_arr])"
+   set cache_list [array get cache_arr]
+
+   return [list 1 $cache_list]
+}
+
+# ;;; Local Variables: ***
+# ;;; mode:tcl ***
+# ;;; End: ***
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

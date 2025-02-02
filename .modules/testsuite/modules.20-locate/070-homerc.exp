@@ -1,0 +1,182 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.20-locate/%M%
+#   Revision:		%I%
+#   First Edition:	1995/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		load, display
+#   Modulefiles:	loc_sym/1.0
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Check the evaluation of the per user modulcmd RC
+#			file
+#		}C%
+#
+##############################################################################
+
+#
+#  Variables. This test forces a module load command. It will result in the
+#    environment variables "_LMFILES_", "LOADEDMODULES" and "testsuite" to
+#    be set up
+#
+
+set module_1 "loc_sym/1.0"
+set modulefile_1 "$modpath/$module_1"
+set modulefilere_1 "$modpathre/$module_1"
+
+#
+#  Set specific HOME setup
+#
+
+set env(HOME) "$env(TESTSUITEDIR)/home"
+
+#
+#  Only checked for the csh
+#
+
+lappend ans [list set __MODULES_LMALTNAME $module_1&loc_sym/sym_home]
+lappend ans [list set _LMFILES_ $modulefile_1]
+lappend ans [list set LOADEDMODULES $module_1]
+lappend ans [list set testsuite yes]
+
+set disp_csh "setenv\t\ttestsuite yes"
+set disp_1 "$modlin\n$modulefilere_1:\n\n$disp_csh\n$modlin"
+
+#
+#  The tests
+#
+
+test_cmd "csh" "load loc_sym/sym_home" $ans
+testouterr_cmd_re "sh" "display loc_sym/sym_home" "OK" "$disp_1"
+
+skip_if_quick_mode
+
+#
+#  Restore the former rc file setup
+#
+
+set env(HOME) $ORIG_HOME
+
+
+#
+# Test user rc file trying to load a module
+#
+
+setenv_var TESTSUITE_USERRC_LOAD 1
+
+set mp $modpath.3
+setenv_path_var MODULEPATH $mp
+setenv_var HOME $env(TESTSUITEDIR)/home.2
+
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/foo/1.0:$mp/bar/1.0]
+lappend ans [list set LOADEDMODULES foo/1.0:bar/1.0]
+
+testouterr_cmd_re sh {load bar/1.0} $ans {}
+
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/foo/1.0]
+lappend ans [list set LOADEDMODULES foo/1.0]
+
+set tserr $modlin\n[escre $mp]/bar/1.0:\n\nmodule-whatis\tbar/1.0\n$modlin
+testouterr_cmd_re sh {display bar/1.0} $ans $tserr
+
+setenv_var TESTSUITE_USERRC_LOAD 2
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ foo/0.load&foo/1.0]
+lappend ans [list set _LMFILES_ $mp/foo/1.0:$mp/foo/0.load:$mp/bar/1.0]
+lappend ans [list set LOADEDMODULES foo/1.0:foo/0.load:bar/1.0]
+lappend ans [list set __MODULES_LMTAG foo/1.0&auto-loaded]
+
+set tserr [msg_top_load foo/0.load {} foo/1.0 {}]
+testouterr_cmd_re sh {load bar/1.0} $ans $tserr
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ foo/0.load&foo/1.0]
+lappend ans [list set _LMFILES_ $mp/foo/1.0:$mp/foo/0.load]
+lappend ans [list set LOADEDMODULES foo/1.0:foo/0.load]
+lappend ans [list set __MODULES_LMTAG foo/1.0&auto-loaded]
+
+append tserr \n\n$modlin\n[escre $mp]/bar/1.0:\n\nmodule-whatis\tbar/1.0\n$modlin
+testouterr_cmd_re sh {display bar/1.0} $ans $tserr
+
+
+#
+# Test erroneous user rc
+#
+
+# user rc file without magic cookie
+set home $env(TESTSUITEDIR)/home.3
+setenv_var HOME $home
+
+set tserr $err_magic'$home/.modulerc'\n$err_contact
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/bar/1.0]
+lappend ans [list set LOADEDMODULES bar/1.0]
+lappend ans [list ERR]
+testouterr_cmd sh {load bar/1.0} $ans $tserr
+
+set tserr [escre $tserr]\n$modlin\n[escre $mp]/bar/1.0:\n\nmodule-whatis\tbar/1.0\n$modlin
+testouterr_cmd_re sh {display bar/1.0} ERR $tserr
+
+# user rc file with magic cookie specifying an higher module version
+set home $env(TESTSUITEDIR)/home.4
+setenv_var HOME $home
+
+set tserr [moderr_minverreq $home/.modulerc 99]
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/bar/1.0]
+lappend ans [list set LOADEDMODULES bar/1.0]
+lappend ans [list ERR]
+testouterr_cmd sh {load bar/1.0} $ans $tserr
+
+set tserr [escre $tserr]\n$modlin\n[escre $mp]/bar/1.0:\n\nmodule-whatis\tbar/1.0\n$modlin
+testouterr_cmd_re sh {display bar/1.0} ERR $tserr
+
+
+#
+# Test ignoring user rc
+#
+
+# erroneous user rc file
+set home $env(TESTSUITEDIR)/home.3
+setenv_var HOME $home
+
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/bar/1.0]
+lappend ans [list set LOADEDMODULES bar/1.0]
+testouterr_cmd sh {load --ignore-user-rc bar/1.0} $ans {}
+testouterr_cmd sh {--ignore-user-rc load bar/1.0} $ans {}
+
+setenv_var MODULES_IGNORE_USER_RC 1
+
+testouterr_cmd sh {load bar/1.0} $ans {}
+testouterr_cmd sh {--ignore-user-rc load bar/1.0} $ans {}
+
+setenv_var MODULES_IGNORE_USER_RC 0
+
+testouterr_cmd sh {--ignore-user-rc load bar/1.0} $ans {}
+
+set tserr $err_magic'$home/.modulerc'\n$err_contact
+set ans [list]
+lappend ans [list set _LMFILES_ $mp/bar/1.0]
+lappend ans [list set LOADEDMODULES bar/1.0]
+lappend ans [list ERR]
+testouterr_cmd sh {load bar/1.0} $ans $tserr
+
+unsetenv_var MODULES_IGNORE_USER_RC
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

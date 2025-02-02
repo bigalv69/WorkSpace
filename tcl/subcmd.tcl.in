@@ -1,0 +1,3168 @@
+##########################################################################
+
+# SUBCMD.TCL, module sub-commands procedures
+# Copyright (C) 2002-2004 Mark Lakata
+# Copyright (C) 2004-2017 Kent Mein
+# Copyright (C) 2016-2023 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+proc cmdModuleList {show_oneperline show_mtime search_match args} {
+   set json [isStateEqual report_format json]
+
+   # load tags from loaded modules
+   cacheCurrentModules
+
+   if {[llength $args] > 0} {
+      defineModEqProc [isIcase] [getConf extended_default]
+      # match passed name against any part of loaded module names
+      set mtest [expr {{contains} in $search_match ? {matchin} : {match}}]
+      set search_queries $args
+      # prepare header message which depend if search is performed
+      set loadedmsg {Currently Loaded Matching Modulefiles}
+   } else {
+      set search_queries {}
+      set loadedmsg {Currently Loaded Modulefiles}
+   }
+
+   set report_indesym [isEltInReport indesym 0]
+   set report_alias [isEltInReport alias 0]
+
+   # build list of loaded modules and symbolics and aliases if reported
+   set loadedmodlist [list]
+   foreach mod [getLoadedModulePropertyList name] {
+      set modfile [getModulefileFromLoadedModule $mod]
+      set mtime [expr {$show_mtime && [file exists $modfile] ?\
+         [getFileMtime $modfile] : {}}]
+      set mod_list($mod) [list modulefile $mtime $modfile]
+
+      # fetch symbols from loaded environment information
+      set modname [file dirname $mod]
+      set sym_list {}
+      foreach altname [getLoadedAltname $mod 0 sym] {
+         # skip non-symbol entry
+         if {$altname ne $modname} {
+            lappend sym_list [file tail $altname]
+            # fill loaded list structure with symbolic versions in case
+            # indesym report is activated
+            if {$report_indesym} {
+               set mod_list($altname) [list version $mod]
+               lappend loadedmodlist $altname
+            }
+         }
+      }
+      set ::g_symbolHash($mod) [lsort -dictionary $sym_list]
+
+      # fetch aliases from loaded environment information
+      if {$report_alias} {
+         foreach altname [getLoadedAltname $mod 0 alias] {
+            set mod_list($altname) [list alias $mod]
+            lappend loadedmodlist $altname
+         }
+      }
+
+      lappend loadedmodlist $mod
+   }
+
+   # filter-out hidden loaded modules unless all module should be seen
+   if {[getState hiding_threshold] <= 1} {
+      set newloadedmodlist [list]
+      foreach mod $loadedmodlist {
+         if {![isModuleTagged $mod hidden-loaded 1]} {
+            lappend newloadedmodlist $mod
+         }
+      }
+      set loadedmodlist $newloadedmodlist
+   }
+
+   # same header msg if no module loaded at all whether search is made or not
+   set noloadedmsg [expr {[llength $loadedmodlist] == 0 ? {No Modulefiles\
+      Currently Loaded.} : {No Matching Modulefiles Currently Loaded.}}]
+
+   # filter loaded modules not matching any of the mod spec passed
+   if {[llength $args] > 0} {
+      # include alt name comparison (alias/sym) when checking module name
+      # depends if alias and/or sym are reported independently
+      set modeq_altname_mode [switch -- $report_indesym$report_alias {
+         11 {expr {0}}
+         10 {expr {7}}
+         01 {expr {6}}
+         00 {expr {2}}
+      }]
+      set matchlist [list]
+      foreach mod $loadedmodlist {
+         foreach pattern $args {
+            # compare pattern against loaded module, its variant set and its
+            # alternative names
+            if {[modEq $pattern $mod $mtest 1 $modeq_altname_mode 1 0 *]} {
+               lappend matchlist $mod
+               break
+            }
+         }
+      }
+      set loadedmodlist $matchlist
+   }
+
+   if {[llength $loadedmodlist] == 0} {
+      if {!$json && [isEltInReport header]} {
+         report $noloadedmsg
+      }
+   } else {
+      set one_per_line [expr {$show_mtime || $show_oneperline}]
+      set show_idx [expr {!$show_mtime && [isEltInReport idx]}]
+      set header [expr {!$json && [isEltInReport header] ? $loadedmsg :\
+         {noheader}}]
+      set theader_cols [list hi Package 39 Versions 19 {Last mod.} 19]
+
+      reportModules $search_queries $header {} terse $show_mtime $show_idx\
+         $one_per_line $theader_cols loaded $loadedmodlist
+
+      # display output key
+      if {!$show_mtime && !$json && [isEltInReport key]} {
+         displayKey
+      }
+   }
+}
+
+proc cmdModuleDisplay {args} {
+   lappendState mode display
+   set first_report 1
+   foreach mod $args {
+      lassign [getPathToModule $mod] modfile modname modnamevr
+      if {$modfile ne {}} {
+         # only one separator lines between 2 modules
+         if {$first_report} {
+            displaySeparatorLine
+            set first_report 0
+         }
+         report [sgr hi $modfile]:\n
+         execute-modulefile $modfile $modname modnamevr $mod
+         displaySeparatorLine
+      }
+   }
+   lpopState mode
+}
+
+proc cmdModulePaths {mod} {
+   set dir_list [getModulePathList exiterronundef]
+   foreach dir $dir_list {
+      array unset mod_list
+      array set mod_list [getModules $dir $mod 0 [list rc_defs_included]]
+
+      # prepare list of dirs for alias/symbol target search, will first search
+      # in currently looked dir, then in other dirs following precedence order
+      set target_dir_list [list $dir {*}[replaceFromList $dir_list $dir]]
+
+      # forcibly enable implicit_default to resolve alias target when it
+      # points to a directory
+      setConf implicit_default 1
+
+      # build list of modulefile to print
+      foreach elt [array names mod_list] {
+         switch -- [lindex $mod_list($elt) 0] {
+            modulefile {
+               lappend ::g_return_text $dir/$elt
+            }
+            virtual {
+               lappend ::g_return_text [lindex $mod_list($elt) 2]
+            }
+            alias - version {
+               # resolve alias target
+               set aliastarget [lindex $mod_list($elt) 1]
+               lassign [getPathToModule $aliastarget $target_dir_list 0]\
+                  modfile modname modnamevr
+               # add module target as result instead of alias
+               if {$modfile ne {} && ![info exists mod_list($modname)]} {
+                  lappend ::g_return_text $modfile
+               }
+            }
+         }
+      }
+
+      # reset implicit_default to restore behavior defined
+      unsetConf implicit_default
+   }
+
+   # sort results if any and remove duplicates
+   if {[info exists ::g_return_text]} {
+      set ::g_return_text [lsort -dictionary -unique $::g_return_text]
+   } else {
+      # set empty value to return empty if no result
+      set ::g_return_text {}
+   }
+}
+
+proc cmdModulePath {mod} {
+   lassign [getPathToModule $mod] modfile modname modnamevr
+   # if no result set empty value to return empty
+   if {$modfile eq {}} {
+      set ::g_return_text {}
+   } else {
+      lappend ::g_return_text $modfile
+   }
+}
+
+proc cmdModuleWhatis {args} {
+   if {[llength $args] == 0} {
+      lappend args {}
+   }
+   foreach mod $args {
+      cmdModuleSearch $mod {}
+   }
+}
+
+proc cmdModuleSearch {{mod {}} {search {}}} {
+   # disable error reporting to avoid modulefile errors
+   # to mix with valid search results
+   inhibitErrorReport
+
+   set json [isStateEqual report_format json]
+
+   set icase [isIcase]
+   defineModEqProc $icase [getConf extended_default]
+
+   lappend searchmod rc_defs_included
+   if {$mod eq {}} {
+      lappend searchmod wild
+   }
+   set foundmod 0
+   lappendState mode whatis
+   set dir_list [getModulePathList exiterronundef]
+   foreach dir $dir_list {
+      array unset mod_list
+      array set mod_list [getModules $dir $mod 0 $searchmod]
+      array unset interp_list
+      array set interp_list {}
+
+      # forcibly enable implicit_default to resolve alias target when it
+      # points to a directory
+      setConf implicit_default 1
+
+      # build list of modulefile to interpret
+      foreach elt [array names mod_list] {
+         switch -- [lindex $mod_list($elt) 0] {
+            modulefile {
+               if {[isModuleTagged $elt forbidden 0 $dir/$elt]} {
+                  # register any error occurring on element matching search
+                  if {[modEq $mod $elt]} {
+                     set err_list($elt) [list accesserr [getForbiddenMsg\
+                        $elt $dir/$elt]]
+                  }
+               } else {
+                  set interp_list($elt) $dir/$elt
+                  # register module name in a global list (shared across
+                  # modulepaths) to get hints when solving aliases/version
+                  set full_list($elt) 1
+               }
+            }
+            virtual {
+               if {[isModuleTagged $elt forbidden 0 [lindex $mod_list($elt)\
+                  2]]} {
+                  # register any error occurring on element matching search
+                  if {[modEq $mod $elt]} {
+                     set err_list($elt) [list accesserr [getForbiddenMsg\
+                        $elt [lindex $mod_list($elt) 2]]]
+                  }
+               } else {
+                  set interp_list($elt) [lindex $mod_list($elt) 2]
+                  set full_list($elt) 1
+               }
+            }
+            alias {
+               # resolve alias target
+               set elt_target [lindex $mod_list($elt) 1]
+               if {![info exists full_list($elt_target)]} {
+                  lassign [getPathToModule $elt_target $dir 0]\
+                     modfile modname modnamevr issuetype issuemsg
+                  # add module target as result instead of alias
+                  if {$modfile ne {} && ![info exists mod_list($modname)]} {
+                     set interp_list($modname) $modfile
+                     set full_list($modname) 1
+                  } elseif {$modfile eq {}} {
+                     # if module target not found in current modulepath add to
+                     # list for global search after initial modulepath lookup
+                     if {[string first {Unable to locate} $issuemsg] == 0} {
+                        set extra_search($modname) [list $dir [modEq $mod\
+                           $elt]]
+                     # register resolution error if alias name matches search
+                     } elseif {[modEq $mod $elt]} {
+                        set err_list($modname) [list $issuetype $issuemsg]
+                     }
+                  }
+               }
+            }
+            version {
+               # report error of version target if matching query
+               set elt_target [getArrayKey mod_list [lindex $mod_list($elt)\
+                  1] $icase]
+               if {[info exists mod_list($elt_target)] && [lindex\
+                  $mod_list($elt_target) 0] in [list invalid accesserr] &&\
+                  [modEq $mod $elt]} {
+                  set err_list($elt_target) $mod_list($elt_target)
+               } elseif {![info exists mod_list($elt_target)]} {
+                  set extra_search($elt_target) [list $dir [modEq $mod $elt]]
+               }
+            }
+            invalid - accesserr {
+               # register any error occurring on element matching search
+               if {[modEq $mod $elt]} {
+                  set err_list($elt) $mod_list($elt)
+               }
+            }
+         }
+      }
+
+      # reset implicit_default to restore behavior defined
+      unsetConf implicit_default
+
+      # in case during modulepath lookup we find an alias target we were
+      # looking for in previous modulepath, remove this element from global
+      # search list
+      foreach elt [array names extra_search] {
+         if {[info exists full_list($elt)]} {
+            unset extra_search($elt)
+         }
+      }
+
+      # save results from this modulepath for interpretation step as there
+      # is an extra round of search to match missing alias target, we cannot
+      # process modulefiles found immediately
+      if {[array size interp_list] > 0} {
+         set interp_save($dir) [array get interp_list]
+      }
+   }
+
+   # forcibly enable implicit_default to resolve alias target when it points
+   # to a directory
+   setConf implicit_default 1
+
+   # find target of aliases in all modulepath except the one already tried
+   foreach elt [array names extra_search] {
+      lassign [getPathToModule $elt {} 0 no [lindex $extra_search($elt) 0]]\
+         modfile modname modnamevr issuetype issuemsg issuefile
+      # found target so append it to results in corresponding modulepath
+      if {$modfile ne {}} {
+         # get belonging modulepath dir depending of module kind
+         if {[isModuleVirtual $modname $modfile]} {
+            set dir [findModulepathFromModulefile\
+               $::g_sourceVirtual($modname)]
+         } else {
+            set dir [getModulepathFromModuleName $modfile $modname]
+         }
+         array unset interp_list
+         if {[info exists interp_save($dir)]} {
+            array set interp_list $interp_save($dir)
+         }
+         set interp_list($modname) $modfile
+         set interp_save($dir) [array get interp_list]
+      # register resolution error if primal alias name matches search
+      } elseif {$modfile eq {} && [lindex $extra_search($elt) 1]} {
+         set err_list($modname) [list $issuetype $issuemsg $issuefile]
+      }
+   }
+
+   # reset implicit_default to restore behavior defined
+   unsetConf implicit_default
+
+   # prepare string translation to highlight search query string
+   set matchmodmap [prepareMapToHightlightSubstr $mod]
+   set matchsearchmap [prepareMapToHightlightSubstr $search]
+
+   # interpret all modulefile we got for each modulepath
+   foreach dir $dir_list {
+      if {[info exists interp_save($dir)]} {
+         array unset interp_list
+         array set interp_list $interp_save($dir)
+         set foundmod 1
+         set display_list {}
+         # interpret every modulefiles obtained to get their whatis text
+         foreach elt [lsort -dictionary [array names interp_list]] {
+            set ::g_whatis {}
+            ##nagelfar ignore Suspicious variable name
+            execute-modulefile $interp_list($elt) $elt $elt $elt 0
+
+            # treat whatis as a multi-line text
+            if {$search eq {} || [regexp -nocase $search $::g_whatis]} {
+               if {$json} {
+                  lappend display_list [formatListEltToJsonDisplay $elt\
+                     whatis a $::g_whatis 1]
+               } else {
+                  set eltsgr [string map $matchmodmap $elt]
+                  foreach line $::g_whatis {
+                     set linesgr [string map $matchsearchmap $line]
+                     lappend display_list "[string repeat { } [expr {20 -\
+                        [string length $elt]}]]$eltsgr: $linesgr"
+                  }
+               }
+            }
+         }
+
+         displayElementList $dir mp sepline 1 0 0 $display_list
+      }
+   }
+   lpopState mode
+
+   setState inhibit_errreport 0
+
+   # report errors if a modulefile was searched but not found
+   if {$mod ne {} && !$foundmod} {
+      # no error registered means nothing was found to match search
+      if {![array exists err_list]} {
+         set err_list($mod) [list none "Unable to locate a modulefile for\
+            '$mod'"]
+      }
+      foreach elt [array names err_list] {
+         reportIssue {*}$err_list($elt)
+      }
+   }
+}
+
+# Intermediate procedure between module and cmdModuleSwitch
+# Adapt options and arguments depending on context to call cmdModuleSwitch
+proc cmdModuleIntSwitch {mode tag_list args} {
+   # pass 'user asked state' to switch procedure
+   set uasked [isTopEvaluation]
+   # CAUTION: it is not recommended to use the `switch` sub-command in
+   # modulefiles as this command is intended for the command-line for a 2in1
+   # operation. Could be removed from the modfile scope in a future release.
+   # Use `module unload` and `module load` commands in modulefiles instead.
+   if {$uasked || $mode eq {load}} {
+      cmdModuleSwitch $uasked $tag_list {*}$args
+   } else {
+      # find what has been asked for unload and load
+      lassign $args swunmod swlomod
+      if {$swlomod eq {} && $swunmod ne {}} {
+         set swlomod $swunmod
+      }
+
+      # apply same mechanisms than for 'module load' and 'module unload' for
+      # an unload evaluation: nothing done for switched-off module and unload
+      # of switched-on module. If auto handling is enabled switched-on module
+      # is handled via UReqUn mechanism (unless if implicit_requirement has
+      # been inhibited). Also unloads are triggered by ongoing reload, purge,
+      # restore, reset, stash or stashpop cmds
+      if {(![getConf auto_handling] || [getState inhibit_req_record] eq\
+         [currentState evalid]) && $swlomod ne {} && [aboveCommandName] ni\
+         [list purge reload restore reset stash stashpop]} {
+         # unload mod if it was loaded prior this mod, not user asked and not
+         # required by another loaded module
+         set modlist [getLoadedModulePropertyList name]
+         set modidx [lsearch -exact $modlist [currentState modulename]]
+         if {$modidx != 0} {
+            set priormodlist [lrange $modlist 0 $modidx]
+            if {[set unmod [getLoadedMatchingName $swlomod {} 0\
+               $priormodlist]] ne {}} {
+               if {[cmdModuleUnload urequn match 1 0 1 1 $unmod]} {
+                  reportWarning "Unload of useless requirement\
+                     [getModuleDesignation loaded $unmod] failed" 1
+               }
+            }
+         }
+      }
+   }
+}
+
+proc cmdModuleSwitch {uasked tag_list old {new {}}} {
+   # if a single name is provided it matches for the module to load and in
+   # this case the module to unload is searched to find the closest match
+   # (loaded module that shares at least the same root name)
+   if {$new eq {}} {
+      set new $old
+      set unload_match close
+   } else {
+      set unload_match match
+   }
+   # save orig names to register them as deps if called from modulefile
+   set argnew $new
+   if {$new eq $old} {
+      set argold {}
+   } else {
+      set argold $old
+   }
+
+   reportDebug "old='$old' new='$new' (uasked=$uasked)"
+
+   # extend requirement recording inhibition to switch subcontext
+   set inhibit_req_rec [expr {[currentState inhibit_req_record] ==\
+      [currentState evalid]}]
+
+   # record sumup messages from underlying unload/load actions under the same
+   # switch message record id to report (evaluation messages still go under
+   # their respective unload/load block
+   pushMsgRecordId switch-$old-$new-[depthState modulename]
+   if {$inhibit_req_rec} {
+      lappendState inhibit_req_record [currentState evalid]
+   }
+
+   # enable unload of sticky mod if stickiness is preserved on swapped-on mod
+   # need to resolve swapped-off module here to get stickiness details
+   lassign [getPathToModule $old {} 0 $unload_match] modfile oldmod oldmodvr
+   set sticky_reload [isStickinessReloading $oldmodvr [list $new]]
+   set supersticky_reload [isStickinessReloading $oldmodvr [list $new]\
+      super-sticky]
+   # do not set sticky or supersticky reload states if swap-on module cannot
+   # be found
+   if {$supersticky_reload || $sticky_reload} {
+      lassign [getPathToModule $new] newmodfile newmod newmodvr
+      if {$newmodfile eq {}} {
+         set sticky_reload 0
+         set supersticky_reload 0
+      }
+   }
+   if {$sticky_reload} {
+      lappendState reloading_sticky $oldmod
+   }
+   if {$supersticky_reload} {
+      lappendState reloading_supersticky $oldmod
+   }
+   ##nagelfar implicitvarcmd {cmdModuleUnload swunload *} oldhidden olduasked\
+      oldmsgrecid deprelist depreisuasked deprevr depreextratag
+   set ret [cmdModuleUnload swunload $unload_match 1 0 0 0 $old]
+   if {$sticky_reload} {
+      lpopState reloading_sticky
+   }
+   if {$supersticky_reload} {
+      lpopState reloading_supersticky
+   }
+
+   # register modulefile to unload as conflict if an unload module is
+   # mentioned on this module switch command set in a modulefile
+   set orig_auto_handling [getConf auto_handling]
+   if {!$uasked && $argold ne {}} {
+      # skip conflict declaration if old spec matches new as in this case
+      # switch means *replace loaded version of mod by this specific version*
+      lassign [getPathToModule $new] newmodfile newmod newmodvr
+      if {$newmod eq {} || ![modEq $argold $newmod eqstart]} {
+         # temporarily disable auto handling just to record deps, not to try
+         # to load or unload them (already tried)
+         setConf auto_handling 0
+         catch {conflict $argold}
+         setConf auto_handling $orig_auto_handling
+      }
+   }
+
+   # attempt load and depre reload only if unload succeed
+   if {!$ret} {
+      if {[info exists depreisuasked]} {
+         set undepreisuasked $depreisuasked
+         set undeprevr $deprevr
+         set undepreextratag $depreextratag
+      }
+      ##nagelfar implicitvarcmd {cmdModuleLoad swload *} newhidden newmsgrecid
+      cmdModuleLoad swload $uasked 0 0 $tag_list $new
+
+      # merge depre info of unload and load phases
+      if {[info exists undepreisuasked]} {
+         set depreisuasked [list {*}$undepreisuasked {*}$depreisuasked]
+         set deprevr [list {*}$undeprevr {*}$deprevr]
+         set depreextratag [list {*}$undepreextratag {*}$depreextratag]
+      }
+
+      if {[getConf auto_handling] && [info exists deprelist] && [llength\
+         $deprelist] > 0} {
+         # cmdModuleUnload handles the DepUn, UReqUn mechanisms and the unload
+         # phase of the DepRe mechanism. List of DepRe mods and their user
+         # asked state is set from cmdModuleUnload procedure to be used here
+         # for the load phase of the DepRe mechanism.
+         # Try DepRe load phase: load failure will not lead to switch failure
+         reloadModuleListLoadPhase deprelist $depreisuasked $deprevr\
+            $depreextratag 1 {Reload of dependent _MOD_ failed} depre
+      }
+
+      # report a summary of automated evaluations if no error
+      reportModuleEval
+   } else {
+      # initialize dummy load phase msg rec id to query designation
+      set newmsgrecid {}
+   }
+
+   # report all recorded sumup messages for this evaluation unless both old
+   # and new modules are set hidden, old was auto loaded and this switch is
+   # done by a modfile
+   reportMsgRecord "Switching from [getModuleDesignation $oldmsgrecid {} 2]\
+      to [getModuleDesignation $newmsgrecid $new 2]" [expr {$oldhidden &&\
+      !$olduasked && $newhidden && !$uasked}]
+   popMsgRecordId
+   if {$inhibit_req_rec} {
+      lpopState inhibit_req_record
+   }
+
+   # register modulefile to load as prereq when called from modulefile
+   if {!$uasked && !$ret && $argnew ne {}} {
+      prereqAnyModfileCmd 0 0 $argnew
+   }
+}
+
+proc cmdModuleSave {{coll default}} {
+   if {![areModuleConstraintsSatisfied]} {
+      reportErrorAndExit {Cannot save collection, some module constraints are\
+         not satistied}
+   }
+
+   # format collection content, version number of modulefile are saved if
+   # version pinning is enabled
+   if {[getConf collection_pin_version]} {
+      set curr_mod_list [getLoadedModuleWithVariantList]
+      set curr_tag_arrser [getLoadedModuleWithVariantSaveTagArrayList]
+   } else {
+      lassign [getSimplifiedLoadedModuleList] curr_mod_list curr_tag_arrser
+   }
+   # generate collection content with header indicating oldest Modules version
+   # compatible with collection syntax
+   set coll_header [expr {[llength $curr_tag_arrser] > 0 ? {#%Module5.1} :\
+      {}}]
+
+   set save [formatCollectionContent [getModulePathList returnempty 0]\
+      $curr_mod_list $curr_tag_arrser $coll_header]
+
+   if { [string length $save] == 0} {
+      reportErrorAndExit {Nothing to save in a collection}
+   }
+
+   # get corresponding filename and its directory
+   lassign [findCollections $coll name] collfile colldesc
+   set colldir [file dirname $collfile]
+
+   if {![file exists $colldir]} {
+      reportDebug "Creating $colldir"
+      if {[catch {file mkdir $colldir} errMsg]} {
+         reportErrorAndExit "Collection directory cannot be created.\n$errMsg"
+      }
+   } elseif {![file isdirectory $colldir]} {
+      reportErrorAndExit "$colldir exists but is not a directory"
+   }
+
+   reportDebug "Saving $collfile"
+
+   if {[catch {
+      set fid [open $collfile w]
+      puts $fid $save
+      close $fid
+   } errMsg ]} {
+      reportErrorAndExit "Collection $colldesc cannot be saved.\n$errMsg"
+   }
+}
+
+proc cmdModuleRestore {args} {
+   # distinguish between zero and one argument provided
+   if {[llength $args] == 0} {
+      set arg_provided 0
+      set coll default
+   } else {
+      set arg_provided 1
+      set coll [lindex $args 0]
+   }
+
+   # get corresponding collection, raise error if it does not exist unless
+   # if no collection name has been provided or if __init__
+   lassign [findCollections $coll exact [expr {!$arg_provided}]\
+      $arg_provided] collfile colldesc
+
+   # forcibly enable implicit_default to restore colls saved in this mode
+   setConf implicit_default 1
+
+   # fetch collection content and differences compared current environment
+   lassign [getDiffBetweenCurEnvAndColl $collfile $colldesc] coll_path_list\
+      coll_mod_list coll_tag_arrser coll_nuasked_list mod_to_unload\
+      mod_to_load path_to_unuse path_to_use is_tags_diff
+   array set coll_tag_arr $coll_tag_arrser
+
+   # create an eval id to track successful/failed module evaluations
+   pushMsgRecordId restore-$coll-[depthState modulename] 0
+
+   # unload modules one by one (no dependency auto unload)
+   foreach mod [lreverse $mod_to_unload] {
+      # test stickiness over full module name version variant designation
+      if {[set vr [getVariantList $mod 1]] ne {}} {
+         lassign [parseModuleSpecification 0 0 0 0 $mod {*}$vr] modvr
+      } else {
+         set modvr $mod
+      }
+      # sticky modules can be unloaded when restoring collection
+      lappendState unloading_sticky $mod
+      if {[set supersticky_reload [isStickinessReloading $modvr $mod_to_load\
+         super-sticky]]} {
+         lappendState reloading_supersticky $mod
+      }
+      cmdModuleUnload unload match 0 0 0 0 $mod
+      lpopState unloading_sticky
+      if {$supersticky_reload} {
+         lpopState reloading_supersticky
+      }
+   }
+   # unuse paths
+   if {[llength $path_to_unuse] > 0} {
+      cmdModuleUnuse load {*}[lreverse $path_to_unuse]
+   }
+
+   # since unloading a module may unload other modules or
+   # paths, what to load/use has to be determined after
+   # the undo phase, so current situation is fetched again
+   set curr_path_list [getModulePathList returnempty 0]
+
+   set curr_mod_list [getLoadedModulePropertyList name]
+   set curr_nuasked_list [getTaggedLoadedModuleList auto-loaded]
+
+   # update tags sets on the modules already loaded at correct position
+   # remove extra tags that are not defined in collection
+   foreach modvr [getLoadedModuleWithVariantList] {
+      if {[info exists coll_tag_arr($modvr)]} {
+         set tag_list $coll_tag_arr($modvr)
+      } else {
+         set tag_list {}
+      }
+      # indicate if module has been asked by user
+      cmdModuleTag 1 [expr {![isModuleTagged $modvr auto-loaded 1]}]\
+         $tag_list $modvr
+   }
+
+   # determine what module to load to restore collection from current
+   # situation with preservation of the load order
+   # list of alternative and simplified names for loaded modules has been
+   # gathered and cached during the previous getMovementBetweenList call on
+   # modules, so here the getMovementBetweenList call will correctly get these
+   # alternative names for module comparison even if no modulepath is left set
+   lassign [getMovementBetweenList $curr_mod_list $coll_mod_list\
+      $curr_nuasked_list $coll_nuasked_list modeq] mod_to_unload mod_to_load
+
+   # proceed as well for modulepath
+   lassign [getMovementBetweenList $curr_path_list $coll_path_list] \
+      path_to_unuse path_to_use
+
+   # reset implicit_default to restore behavior defined
+   unsetConf implicit_default
+
+   # use paths
+   if {[llength $path_to_use] > 0} {
+      # always append path here to guaranty the order
+      # computed above in the movement lists
+      cmdModuleUse load append {*}$path_to_use
+   }
+
+   # load modules one by one with user asked state preserved
+   foreach mod $mod_to_load {
+      cmdModuleLoad load [expr {$mod ni $coll_nuasked_list}] 0 0\
+         $coll_tag_arr($mod) $mod
+   }
+
+   popMsgRecordId 0
+}
+
+proc cmdModuleSaverm {{coll default}} {
+   # avoid to remove any kind of file with this command
+   if {[string first / $coll] > -1} {
+      reportErrorAndExit {Command does not remove collection specified as\
+         filepath}
+   }
+
+   # get corresponding collection, raise error if it does not exist, but do
+   # not check if collection is valid
+   lassign [findCollections $coll exact 0 1 0] collfile colldesc
+
+   # attempt to delete specified collection
+   if {[catch {
+      file delete $collfile
+   } errMsg ]} {
+      reportErrorAndExit "Collection $colldesc cannot be removed.\n$errMsg"
+   }
+}
+
+proc cmdModuleSaveshow {args} {
+   # distinguish between zero and one argument provided
+   if {[llength $args] == 0} {
+      set arg_provided 0
+      set coll default
+   } else {
+      set arg_provided 1
+      set coll [lindex $args 0]
+   }
+
+   # get corresponding collection, raise error if it does not exist unless
+   # if no collection name has been provided or if __init__
+   lassign [findCollections $coll exact [expr {!$arg_provided}]\
+      $arg_provided] collfile colldesc
+
+   # read specific __init__ collection from __MODULES_LMINIT env var
+   if {$collfile eq {__init__}} {
+      lassign [parseCollectionContent [getLoadedModulePropertyList init]]\
+         coll_path_list coll_mod_list coll_tag_arrser
+      set collfile {initial environment}
+      set coll __init__
+   } else {
+      lassign [readCollectionContent $collfile $colldesc] coll_path_list\
+         coll_mod_list coll_tag_arrser
+   }
+
+   # collection should at least define a path or a mod, but initial env may be
+   # totally empty
+   if {$coll ne {__init__} && [llength $coll_path_list] == 0 && [llength\
+      $coll_mod_list] == 0} {
+      reportErrorAndExit "$colldesc is not a valid collection"
+   }
+
+   displaySeparatorLine
+   report [sgr hi $collfile]:\n
+   report [formatCollectionContent $coll_path_list $coll_mod_list\
+      $coll_tag_arrser {} 1]
+   displaySeparatorLine
+}
+
+proc cmdModuleSavelist {show_oneperline show_mtime search_match args} {
+   # if a target is set, only list collection matching this target (means
+   # having target as suffix in their name) unless if --all option is set
+   set colltarget [getConf collection_target]
+   if {$colltarget ne {} && [getState hiding_threshold] < 2} {
+      set suffix .$colltarget
+      set targetdesc " (for target \"$colltarget\")"
+   } else {
+      set suffix {}
+      set targetdesc {}
+   }
+
+   set json [isStateEqual report_format json]
+
+   reportDebug "list collections$targetdesc"
+
+   # if only stash collection are expected, start result index at 0, sort
+   # results in reverse order (latest first) and ensure only collection from
+   # current target (and no-target if none set) are returned.
+   if {[getCallingProcName] eq {cmdModuleStashlist}} {
+      set start_idx 0
+      set sort_opts [list -dictionary -decreasing]
+      set find_no_other_target 1
+      set typedesc stash
+      # no icase match as stash collections are only lowercases
+      set icase 0
+   } else {
+      set start_idx 1
+      set sort_opts [list -dictionary]
+      set find_no_other_target 0
+      set typedesc named
+      set icase [isIcase]
+   }
+
+   if {[llength $args] > 0} {
+      defineModEqProc $icase 0
+      # match passed name against any part of collection names
+      set mtest [expr {{contains} in $search_match ? {matchin} : {match}}]
+   }
+
+   # prepare header message which depend if search is performed (no search
+   # considered if listing stash collections)
+   if {[llength $args] > 0 && $typedesc ne {stash}} {
+      set collmsg "Matching $typedesc collection list$targetdesc:"
+   } else {
+      set collmsg "[string totitle $typedesc] collection list$targetdesc:"
+   }
+
+   foreach collfile [findCollections * glob 0 0 1 $find_no_other_target] {
+      # remove target suffix from names to display
+      regsub $suffix$ [file tail $collfile] {} coll
+      # filter stash collections unless called by stashlist or --all opt set
+      if {$typedesc ne {named} || ![regexp {stash-\d+} $coll] || [getState\
+         hiding_threshold] >= 2} {
+         set coll_arr($coll) $collfile
+      }
+   }
+
+   # same header msg if no collection at all whether search is made or not
+   if {![array exists coll_arr] || $typedesc eq {stash}} {
+      set nocollmsg "No $typedesc collection$targetdesc."
+   } else {
+      set nocollmsg "No matching $typedesc collection$targetdesc."
+   }
+
+   # filter collection not matching any of the passed specification
+   if {[llength $args] > 0} {
+      set matchlist [list]
+      foreach coll [array names coll_arr] {
+         set match 0
+         foreach pattern $args {
+            # compare pattern against collections using comparison module proc
+            # useful for suffix/prefix/icase checks, disabling module-specific
+            # checks (variants, alternative names, etc)
+            if {[modEq $pattern $coll $mtest 0 0 0 0 *]} {
+               set match 1
+               break
+            }
+         }
+         if {!$match} {
+            unset coll_arr($coll)
+         }
+      }
+   }
+
+   if {[array size coll_arr] == 0} {
+      if {!$json} {
+         report $nocollmsg
+      }
+   } else {
+      if {!$json} {
+         if {$show_mtime} {
+            displayTableHeader hi Collection 59 {Last mod.} 19
+         }
+         report $collmsg
+      }
+      set display_list {}
+      set len_list {}
+      set max_len 0
+      set one_per_line [expr {$show_mtime || $show_oneperline}]
+      set show_idx [expr {!$one_per_line}]
+      # prepare query to highlight
+      set himatchmap [prepareMapToHightlightSubstr {*}$args]
+
+      foreach coll [lsort {*}$sort_opts [array names coll_arr]] {
+         if {$json} {
+            lappend display_list [formatListEltToJsonDisplay $coll target s\
+               $colltarget 1 pathname s $coll_arr($coll) 1]
+         # no need to test coll consistency as findCollections does not return
+         # collection whose name starts with "."
+         } else {
+            set collsgr [sgr {} $coll $himatchmap]
+            if {$show_mtime} {
+               set filetime [clock format [getFileMtime $coll_arr($coll)]\
+                  -format {%Y/%m/%d %H:%M:%S}]
+               lappend display_list [format %-60s%19s $collsgr $filetime]
+            } else {
+               lappend display_list $collsgr
+               lappend len_list [set len [string length $coll]]
+               if {$len > $max_len} {
+                  set max_len $len
+               }
+            }
+         }
+      }
+
+      displayElementList noheader {} {} $one_per_line $show_idx $start_idx\
+         $display_list $len_list $max_len
+   }
+}
+
+
+proc cmdModuleSource {mode args} {
+   foreach mod $args {
+      set rawarg [getRawArgumentFromVersSpec $mod]
+      if {$mod eq {}} {
+         reportErrorAndExit {File name empty}
+      # first check if raw specification is an existing file
+      } elseif {[file exists [set absfpath [getAbsolutePath $rawarg]]]} {
+         set modfile $absfpath
+         set modname $absfpath
+         set modnamevr $absfpath
+         # unset module specification not to confuse specific char in file
+         # path (like '+') with variant specification
+         unsetModuleVersSpec $mod
+         set mod $absfpath
+      # if not a path specification, try to resolve a modulefile
+      } elseif {![isModuleFullPath $rawarg]} {
+         lassign [getPathToModule $mod] modfile modname modnamevr
+         # stop if no module found, issue has been reported by getPathToModule
+         if {$modfile eq {}} {
+            break
+         }
+      } else {
+         reportErrorAndExit "File $rawarg does not exist"
+      }
+
+      ##nagelfar ignore Found constant
+      lappendState mode $mode
+      # sourced file must also have a magic cookie set at their start
+      ##nagelfar ignore Suspicious variable name
+      execute-modulefile $modfile $modname $modnamevr $mod 0 0
+      ##nagelfar ignore Found constant
+      lpopState mode
+   }
+}
+
+# Intermediate procedure between module and cmdModuleLoad/prereq
+# Adapt options and arguments depending on context to call cmdModuleLoad or
+# one of the prereq procedures
+proc cmdModuleIntLoad {topcall command mode tag_list args} {
+   # ignore flag used in collection to track non-user asked state
+   set args [replaceFromList $args --notuasked]
+   # no error raised on empty argument list to cope with initadd command that
+   # may expect this behavior
+   if {[llength $args] == 0} {
+      return
+   }
+
+   set ret 0
+   # if top command is source, consider module load commands made within
+   # sourced file evaluation as top load command
+   if {[isTopEvaluation]} {
+      # is eval a regular attempt or a try (silence not found error)
+      set tryload [expr {$command in {try-load load-any}}]
+      set loadany [expr {$command eq {load-any}}]
+      set ret [cmdModuleLoad load 1 $tryload $loadany $tag_list {*}$args]
+   } elseif {$mode eq {load}} {
+      # auto load is inhibited if currently in DepRe context only register
+      # requirement
+      set subauto [expr {[currentModuleEvalContext] eq {depre} ? {0} : {1}}]
+      if {$command eq {try-load}} {
+         # attempt load of not already loaded modules
+         if {$subauto} {
+            foreach arg $args {
+               lassign [loadRequirementModuleList 1 0 $tag_list $arg] retlo
+               # update return value if an issue occurred unless force mode is
+               # enabled
+               if {$retlo != 0 && ![getState force]} {
+                  set ret $retlo
+               }
+            }
+         }
+         # record requirement as optional: no error if not loaded but reload
+         # will be triggered if loaded later on
+         prereqAllModfileCmd 1 0 --optional --tag [join $tag_list :] {*}$args
+      } elseif {$command eq {load-any}} {
+         # load and register requirement in a OR-operation
+         prereqAnyModfileCmd 1 $subauto --tag [join $tag_list :] {*}$args
+      } else {
+         # load and register requirement in a AND-operation
+         prereqAllModfileCmd 0 $subauto --tag [join $tag_list :] {*}$args
+      }
+   # mods unload is handled via UReqUn mechanism when auto enabled (unless if
+   # implicit_requirement has been inhibited) also unloads are triggered by
+   # ongoing reload, purge, restore, reset, stash or stashpop cmds
+   } elseif {(![getConf auto_handling] || [getState inhibit_req_record] eq\
+      [currentState evalid]) && [aboveCommandName] ni [list purge reload\
+      restore reset stash stashpop]} {
+      # on unload mode, unload mods in reverse order, if loaded prior this
+      # mod, if not user asked and not required by other loaded mods
+      set modlist [getLoadedModulePropertyList name]
+      set modidx [lsearch -exact $modlist [currentState modulename]]
+      if {$modidx != 0} {
+         set priormodlist [lrange $modlist 0 $modidx]
+         foreach arg [lreverse $args] {
+            if {[set unmod [getLoadedMatchingName $arg {} 0 $priormodlist]]\
+               ne {}} {
+               if {[cmdModuleUnload urequn match 1 0 1 1 $unmod]} {
+                  reportWarning "Unload of useless requirement\
+                     [getModuleDesignation loaded $unmod] failed" 1
+               }
+            }
+         }
+      }
+   }
+   # sub-module interpretation failed, raise error
+   if {$ret && !$topcall} {
+      knerror {} MODULES_ERR_SUBFAILED
+   }
+}
+
+proc cmdModuleLoad {context uasked tryload loadany tag_list args} {
+   reportDebug "loading $args (context=$context, uasked=$uasked,\
+      tryload=$tryload, loadany=$loadany)"
+
+   set ret 0
+   set loadok 0
+   lappendState mode load
+   foreach mod $args {
+      # stop when first module in list is loaded if any mode enabled
+      if {$loadok && $loadany} {
+         break
+      }
+
+      # if a switch action is ongoing...
+      if {$context eq {swload}} {
+         set swprocessing 1
+         # context is ReqLo if switch is called from a modulefile
+         if {![isMsgRecordIdTop]} {
+            set context reqlo
+         }
+         upvar newhidden hidden
+         upvar newmsgrecid msgrecid
+      }
+      # loading module is visible by default
+      set hidden 0
+      # error if module not found or forbidden
+      set notfounderr [expr {!$tryload}]
+
+      # record evaluation attempt on specified module name
+      registerModuleEvalAttempt $context $mod
+      lassign [getPathToModule $mod {} $notfounderr] modfile modname modnamevr
+
+      # set a unique id to record messages related to this evaluation.
+      set msgrecid load-$modnamevr-[depthState modulename]
+
+      # go to next module to load if not matching module found
+      if {$modfile eq {}} {
+         set ret $notfounderr
+         continue
+      }
+
+      if {[isModuleEvalFailed load $modnamevr]} {
+         reportDebug "$modnamevr ($modfile) load was already tried and failed"
+         # nullify this evaluation attempt to avoid duplicate issue report
+         unregisterModuleEvalAttempt $context $mod
+         continue
+      }
+
+      # if a switch action is ongoing...
+      if {[info exists swprocessing]} {
+         # pass the DepRe mod list to the calling cmdModuleSwitch procedure to
+         # let it handle the load phase of the DepRe mechanism along with the
+         # DepRe modules set from switched off module.
+         upvar deprelist swdeprelist
+         upvar depreisuasked depreisuasked
+         upvar deprevr deprevr
+         upvar depreextratag depreextratag
+
+         # transmit loaded mod name for switch report summary
+         uplevel 1 set new "{$modnamevr}"
+      }
+
+      # register record message unique id (now we know mod will be evaluated)
+      pushMsgRecordId $msgrecid
+
+      # record evaluation attempt on actual module name
+      registerModuleEvalAttempt $context $modnamevr
+      registerModuleEvalAttempt $context $modfile
+
+      # check if passed modname correspond to an already loaded modfile
+      # and get its loaded name (in case it has been loaded as full path)
+      set loadedmodname [getLoadedMatchingName $modnamevr]
+      if {$loadedmodname ne {}} {
+         set modname $loadedmodname
+         set modnamevr $modname
+         if {[set vr [getVariantList $modname 1]] ne {}} {
+            append modnamevr " $vr"
+         }
+      }
+
+      # record module title (with the variant specified on load call, and no
+      # tag list) prior module evaluation to get this title ready in case of
+      # eval error
+      registerModuleDesignation $msgrecid $modname [getVariantList $mod 7 0\
+         1] {}
+
+      pushSettings
+      if {[set errCode [catch {
+         if {[set isloaded [isModuleLoaded $modname]] || [set isloading\
+            [isModuleLoading $modname]]} {
+            reportDebug "$modname ($modfile) already loaded/loading"
+            # stop if same mod is loaded but with a different set of variants
+            if {$modname ne $modnamevr && (($isloaded &&
+               [getLoadedMatchingName $modnamevr] eq {}) || ([info exists\
+               isloading] && $isloading && [getLoadedMatchingName $modnamevr\
+               {} 1] eq {}))} {
+               set errlocalreport 1
+               knerror [getModWithAltVrIsLoadedMsg $modname]
+            } else {
+               # apply missing tag to loaded module
+               set rettag [cmdModuleTag 0 $uasked $tag_list $modname]
+
+               # report module is already loaded if verbose2 or higher level
+               # and no new tag set
+               if {$isloaded && $rettag != 2 && [isVerbosityLevel verbose2]} {
+                  reportInfo "Module '$modname' is already loaded"
+                  registerModuleDesignation $msgrecid $modname\
+                     [getVariantList $modname 7] [getExportTagList $modname]
+                  reportMsgRecord "Loading [getModuleDesignation $msgrecid {}\
+                     2]"
+               }
+
+               # exit treatment but no need to restore settings
+               set loadok 1
+               continue
+            }
+         }
+
+         # register altname of modname prior any conflict check
+         setLoadedAltname $modname {*}[getAllModuleResolvedName $modname 1\
+            $mod]
+
+         if {[getConf auto_handling]} {
+            # get loaded modules holding a requirement on modname and able to
+            # be reloaded
+            set deprelist [getUnmetDependentLoadedModuleList $modnamevr]
+            reportDebug "depre mod list is '$deprelist'"
+
+            # Reload all modules that have declared a prereq on mod as they
+            # may take benefit from their prereq availability if it is newly
+            # loaded. First perform unload phase of the reload, prior mod load
+            # to ensure these dependent modules are unloaded with the same
+            # loaded prereq as when they were loaded
+            if {[llength $deprelist] > 0} {
+               lassign [reloadModuleListUnloadPhase deprelist [getState\
+                  force] {Unload of dependent _MOD_ failed} depun]\
+                  depreisuasked deprevr depreextratag
+               if {[info exists swprocessing]} {
+                  if {[info exists swdeprelist]} {
+                     set swdeprelist [list {*}$deprelist {*}$swdeprelist]
+                  } else {
+                     set swdeprelist $deprelist
+                  }
+               }
+            }
+         }
+
+         # record additional tags passed through --tag option prior mod eval
+         # to make them known within evaluation
+         if {[llength $tag_list] > 0} {
+            # record tags set with --tag as extra tag excluding tags relative
+            # to the way module is loaded (auto, keep)
+            lassign [getDiffBetweenList $tag_list [list auto-loaded\
+               keep-loaded]] extratag_list
+            setModuleTag $modname {*}$tag_list
+            if {[llength $extratag_list] > 0} {
+               setModuleExtraTag $modname {*}$extratag_list
+            }
+            if {$modnamevr ne {} && $modname ne $modnamevr} {
+               setModuleTag $modnamevr {*}$tag_list
+               if {[llength $extratag_list] > 0} {
+                  setModuleExtraTag $modnamevr {*}$extratag_list
+               }
+            }
+         }
+
+         if {[execute-modulefile $modfile $modname modnamevr $mod]} {
+            break
+         }
+
+         # register this evaluation on the main one that triggered it (after
+         # load evaluation to report correct order with other evaluations)
+         registerModuleEval $context $msgrecid
+
+         # raise an error if a conflict violation is detected
+         # do that after modfile evaluation to give it the chance to solve its
+         # (module unload) conflicts through its evaluation
+         lassign [doesModuleConflict $modname] doescon modconlist\
+            moddecconlist
+         set retisconun [isModuleEvaluated conun $modnamevr {*}$modconlist]
+         if {![set retiseval [isModuleEvaluated any $modnamevr\
+            {*}$modconlist]] || [currentState msgrecordid] ne [topState\
+            msgrecordid] || !$retisconun} {
+            # more appropriate msg if an evaluation was attempted or is
+            # by-passed. error is reported using declared conflict name (as if
+            # it was raised raised from a conflict modulefile command)
+            set conmsg [expr {$retiseval || [getState force] ?\
+               [getConIsLoadedMsg $moddecconlist [is-loading $modconlist]] :\
+               [getErrConflictMsg $moddecconlist]}]
+         }
+
+         # still proceed if force mode enabled
+         if {[getState force] && $doescon} {
+            defineModEqProc [isIcase] [getConf extended_default]
+            # report warning if not already done
+            set report_con 1
+            if {[info exists ::report_conflict($msgrecid)]} {
+               # check if conflict has not been already reported with an
+               # alternative name
+               foreach modcon $modconlist {
+                  foreach reportmod $::report_conflict($msgrecid) {
+                     if {[modEq $reportmod $modcon eqstart 1 2 1]} {
+                        set report_con 0
+                        break
+                     }
+                  }
+                  if {!$report_con} {
+                     break
+                  }
+               }
+               if {$report_con} {
+                  foreach moddeccon $moddecconlist {
+                     foreach reportmod $::report_conflict($msgrecid) {
+                        if {[modEq $reportmod $moddeccon eqstart]} {
+                           set report_con 0
+                           break
+                        }
+                     }
+                     if {!$report_con} {
+                        break
+                     }
+                  }
+               }
+            }
+            if {$report_con && [info exists conmsg]} {
+               reportWarning $conmsg
+            }
+            # raise conun-specific msg to top level if attempted
+            if {$retisconun} {
+               reportWarning [getErrConUnMsg $moddecconlist] 1
+            }
+         } elseif {$doescon} {
+            if {$retisconun} {
+               if {[info exists conmsg]} {
+                  reportError $conmsg
+               }
+               # raise conun-specific msg to top level if attempted
+               knerror [getErrConUnMsg $moddecconlist]
+            } else {
+               set errlocalreport 1
+               knerror $conmsg
+            }
+         }
+
+         # loading visibility depends on hidden-loaded tag
+         set hidden [isModuleTagged $modnamevr hidden-loaded 1 $modfile]
+
+         append-path LOADEDMODULES $modname
+         # allow duplicate modfile entries for virtual modules
+         append-path --duplicates _LMFILES_ $modfile
+         # update cache arrays
+         setLoadedModule $modname $modfile $uasked $modnamevr [expr {$modname\
+            in [getState refresh_qualified]}]
+
+         # register declared source-sh in environment
+         if {[set modsrcsh [getLoadedSourceSh $modname 1]] ne {}} {
+            append-path __MODULES_LMSOURCESH $modsrcsh
+         }
+
+         # register declared conflict in environment
+         if {[set modcon [getLoadedConflict $modname 1]] ne {}} {
+            append-path __MODULES_LMCONFLICT $modcon
+         }
+
+         # declare the prereq of this module
+         if {[set modpre [getLoadedPrereq $modname 1]] ne {}} {
+            append-path __MODULES_LMPREREQ $modpre
+         }
+
+         # declare the alternative names of this module
+         if {[set modalt [getLoadedAltname $modname 1]] ne {}} {
+            append-path __MODULES_LMALTNAME $modalt
+         }
+
+         # declare the variant of this module
+         if {[set modvrspec [getLoadedVariant $modname 1]] ne {}} {
+            append-path __MODULES_LMVARIANT $modvrspec
+         }
+
+         # declare the tags of this module
+         if {[set modtag [getExportTagList $modnamevr 1 $modfile]] ne {}} {
+            append-path __MODULES_LMTAG $modtag
+         }
+         if {[set modtag [getExtraTagList $modnamevr 1]] ne {}} {
+            append-path __MODULES_LMEXTRATAG $modtag
+         }
+
+         # declare module qualified for refresh evaluation
+         if {[isModuleRefreshQualified $modname]} {
+            append-path __MODULES_LMREFRESH $modname
+         }
+
+         # Load phase of dependent module reloading. These modules can adapt
+         # now that mod is seen loaded. Except if switch action ongoing (DepRe
+         # load phase will occur from switch)
+         if {[getConf auto_handling] && [llength $deprelist] > 0 && ![info\
+            exists swprocessing]} {
+            reloadModuleListLoadPhase deprelist $depreisuasked $deprevr\
+               $depreextratag [getState force] {Reload of dependent _MOD_\
+               failed} depre
+         }
+
+         # record module title (name, variants and tags)
+         registerModuleDesignation $msgrecid $modname [getVariantList\
+            $modname 7] [getExportTagList $modname 0 $modfile]
+
+         # consider evaluation hidden if hidden loaded module is auto loaded
+         # and no specific messages are recorded for this evaluation
+         if {$hidden && !$uasked && ![isMsgRecorded]} {
+            registerModuleEvalHidden $context $msgrecid
+         }
+
+         # report a summary of automated evaluations if no error
+         reportModuleEval
+      } errMsg]] != 0 && $errCode != 4} {
+         # in case of error report module info even if set hidden
+         set hidden 0
+         if {$errMsg ne {}} {
+            reportError $errMsg [expr {![info exists errlocalreport]}]
+         }
+         # report switched-on module load failure under switch info block
+         # unless the above reportError call already put a mesg to this block
+         if {[info exists swprocessing] && ($errMsg eq {} || [info exists\
+            errlocalreport])} {
+            # warn as this issue does not lead to a rollback of switch action
+            reportWarning "Load of switched-on [getModuleDesignation\
+               $msgrecid] failed" 1
+         }
+         # rollback settings if some evaluation went wrong
+         set ret 1
+         restoreSettings
+         # remove from successfully evaluated module list
+         registerModuleEval $context $msgrecid $modnamevr load
+         unset -nocomplain errlocalreport
+      }
+      popSettings
+
+      # report all recorded messages for this evaluation except if module were
+      # already loaded
+      if {$errCode != 4} {
+         reportMsgRecord "Loading [getModuleDesignation $msgrecid {} 2]"\
+            [expr {$hidden && !$uasked}]
+      }
+      popMsgRecordId
+
+      if {$errCode == 0} {
+         set loadok 1
+      }
+   }
+   lpopState mode
+
+   # raise error if no module has been loaded or has produced an error during
+   # its load attempt in case of top-level load-any sub-command
+   if {!$ret && !$loadok && $context eq {load} && $loadany} {
+      knerror "No module has been loaded"
+   }
+
+   return $ret
+}
+
+# Intermediate procedure between module and cmdModuleUnload
+# Adapt options and arguments depending on context to call cmdModuleUnload
+proc cmdModuleIntUnload {mode args} {
+   # if top command is source, consider module load commands made within
+   # sourced file evaluation as top load command
+   if {[isTopEvaluation]} {
+      set ret [cmdModuleUnload unload match 1 0 0 0 {*}$args]
+   } elseif {$mode eq {load}} {
+      # unload mods only on load mode, nothing done on unload mode as the
+      # registered conflict guarantees the target module cannot be loaded
+      # unless forced
+      # do not unload module required by others even in force mode
+      set ret [cmdModuleUnload conun match 0 0 0 1 {*}$args]
+
+      # register modulefiles to unload as individual conflicts
+      foreach arg $args {
+         # do not break on error yet, go through the whole modfile evaluation
+         # in case conflict is solved later on
+         catch {conflict $arg}
+      }
+      # sub-module interpretation failed, raise error
+      if {$ret} {
+         knerror {} MODULES_ERR_SUBFAILED
+      }
+   }
+}
+
+proc cmdModuleUnload {context match auto force onlyureq onlyndep args} {
+   reportDebug "unloading $args (context=$context, match=$match, auto=$auto,\
+      force=$force, onlyureq=$onlyureq, onlyndep=$onlyndep)"
+
+   set ret 0
+   lappendState mode unload
+   foreach mod $args {
+      # if a switch action is ongoing...
+      if {$context eq {swunload}} {
+         set swprocessing 1
+         # context is ConUn if switch is called from a modulefile
+         if {![isMsgRecordIdTop]} {
+            set context conun
+         }
+         upvar oldhidden hidden
+         upvar olduasked uasked
+         upvar oldmsgrecid msgrecid
+      }
+      # unloading module is visible by default
+      set hidden 0
+      set uasked 1
+
+      # record evaluation attempt on specified module name
+      registerModuleEvalAttempt $context $mod
+      # resolve by also looking at matching loaded module and update mod
+      # specification to fully match obtained loaded module
+      # enable report_issue flag to report empty module name issue
+      lassign [getPathToModule $mod {} 1 $match] modfile modname\
+         modnamevr errkind
+
+      # set a unique id to record messages related to this evaluation.
+      set msgrecid unload-$modnamevr-[depthState modulename]
+
+      # record module title (with the variant specified on unload call, and no
+      # tag list) prior module evaluation to get this title ready in case of
+      # eval error
+      registerModuleDesignation $msgrecid $modname [getVariantList $modnamevr\
+         7 0 1] {}
+
+      # if a switch action is ongoing...
+      if {[info exists swprocessing]} {
+         # pass the DepRe mod list to the calling cmdModuleSwitch
+         # procedure to let it handle the load phase of the DepRe
+         # mechanism once the switched-to module will be loaded
+         upvar deprelist deprelist
+         upvar depreisuasked depreisuasked
+         upvar deprevr deprevr
+         upvar depreextratag depreextratag
+
+         # transmit unloaded mod name for switch report summary
+         uplevel 1 set old "{$modnamevr}"
+      }
+
+      if {$modfile eq {}} {
+         # no error return if module is not loaded
+         if {$errkind eq {notloaded}} {
+            reportDebug "$modname is not loaded"
+            # report module is not loaded if verbose2 or higher level
+            if {[isVerbosityLevel verbose2]} {
+               pushMsgRecordId $msgrecid
+               reportInfo "Module '$modname' is not loaded"
+               reportMsgRecord "Unloading [getModuleDesignation $msgrecid {}\
+                  2]"
+            }
+         } else {
+            # return error code in case of empty module name
+            set ret 1
+         }
+         # go to next module to unload
+         continue
+      }
+
+      if {$onlyureq && ![isModuleUnloadable $modname]}  {
+         reportDebug "$modname ($modfile) is required by loaded module or\
+            asked by user"
+         continue
+      }
+
+      if {[isModuleEvalFailed unload $modnamevr]} {
+         reportDebug "$modnamevr ($modfile) unload was already tried and\
+            failed"
+         # nullify this evaluation attempt to avoid duplicate issue report
+         unregisterModuleEvalAttempt $context $mod
+         continue
+      }
+
+      # register record message unique id (now we know mod will be evaluated)
+      pushMsgRecordId $msgrecid
+
+      # record evaluation attempt on actual module name
+      registerModuleEvalAttempt $context $modnamevr
+      registerModuleEvalAttempt $context $modfile
+
+      # record module title (name, variants and tags)
+      registerModuleDesignation $msgrecid $modname [getVariantList $modname\
+         7] [getExportTagList $modname]
+
+      pushSettings
+      if {[set errCode [catch {
+         # error if unloading module violates a registered prereq
+         # and auto handling mode is disabled
+         set prereq_list [getDependentLoadedModuleList [list $modname]]
+         if {[llength $prereq_list] > 0 && (![getConf auto_handling] ||\
+            !$auto)} {
+            # force mode should not affect if we only look for mods w/o dep
+            ##nagelfar ignore Found constant
+            if {([getState force] || $force) && !$onlyndep} {
+               # in case unload is called for a DepRe mechanism do not warn
+               # about prereq violation enforced as it is due to the dependent
+               # module which is already in a violation state
+               # warn in case of a purge
+               if {$auto || !$force || [currentState commandname] eq\
+                  {purge}} {
+                  reportWarning [getDepLoadedMsg $prereq_list]
+               }
+            } else {
+               set errlocalreport 1
+               # exit treatment but no need to set return code to error if
+               # called from a 'module unload' command in a modulefile in a
+               # load evaluation mode, as set conflict will raise error at end
+               # of modulefile evaluation
+               if {$onlyndep} {
+                  set errharmless 1
+               }
+               knerror [expr {[isModuleEvaluated any $modnamevr\
+                  {*}$prereq_list] ? [getDepLoadedMsg $prereq_list] :\
+                  [getErrPrereqMsg $prereq_list 0]}]
+            }
+         }
+
+         if {[getConf auto_handling] && $auto} {
+            # compute lists of modules to update due to modname unload prior
+            # unload to get requirement info before it vanishes
+
+            # DepUn: Dependent to Unload (modules actively requiring modname
+            # or a module part of this DepUn batch)
+            set depunnpolist [getDependentLoadedModuleList [list $modname] 1\
+               0 1 0]
+            set depunlist [getDependentLoadedModuleList [list $modname] 1 0 0\
+               0]
+            # look at both regular dependencies or No Particular Order
+            # dependencies: use NPO result if situation can be healed with NPO
+            # dependencies, which will be part of DepRe list to restore the
+            # correct loading order for them
+            if {[llength $depunnpolist] <= [llength $depunlist]} {
+               set depunlist $depunnpolist
+            }
+            reportDebug "depun mod list is '$depunlist'"
+
+            # do not check for UReqUn mods coming from DepUn modules as these
+            # DepUn modules are reloaded
+            if {[info exists swprocessing]} {
+               set urequnqry [list $modname]
+            } else {
+               set urequnqry [list {*}$depunlist $modname]
+            }
+
+            # UReqUn: Useless Requirement to Unload (autoloaded requirements
+            # of modname or DepUn modules not required by any remaining mods)
+            set urequnlist [getUnloadableLoadedModuleList $urequnqry]
+            reportDebug "urequn mod list is '$urequnlist'"
+
+            # DepRe: Dependent to Reload (modules optionally dependent or in
+            # conflict with modname, DepUn or UReqUn modules + modules
+            # dependent of a module part of this DepRe batch)
+            set deprelist [getDependentLoadedModuleList [list {*}$urequnlist\
+               {*}$depunlist $modname] 0 0 1 0 1 1]
+            reportDebug "depre mod list is '$deprelist'"
+
+            # DepUn mods are merged into the DepRe list as an attempt to
+            # reload these DepUn mods is made once switched-to mod loaded
+            if {[info exists swprocessing]} {
+               set deprelist [sortModulePerLoadedAndDepOrder [list\
+                  {*}$depunlist {*}$deprelist] 1]
+               set depunlist {}
+            }
+
+            # Reload of all DepRe mods, as they may adapt from the mod unloads
+            # happening here. First perform unload phase of the reload, prior
+            # mod unloads to ensure these dependent mods are unloaded with the
+            # same loaded prereq as when they were loaded. Avoid modules not
+            # satisfying their constraint.
+            if {[llength $deprelist] > 0} {
+               ##nagelfar ignore +2 Found constant
+               lassign [reloadModuleListUnloadPhase deprelist [getState\
+                  force] {Unload of dependent _MOD_ failed} depun]\
+                  depreisuasked deprevr depreextratag
+            }
+
+            # DepUn modules unload prior main mod unload
+            if {[llength $depunlist] > 0} {
+               foreach unmod [lreverse $depunlist] {
+                  ##nagelfar ignore Found constant
+                  if {[cmdModuleUnload depun match 0 0 0 0 $unmod]} {
+                     # stop if one unload fails unless force mode enabled
+                     set errMsg "Unload of dependent [getModuleDesignation\
+                        loaded $unmod] failed"
+                     ##nagelfar ignore Found constant
+                     if {[getState force] || $force} {
+                        reportWarning $errMsg 1
+                     } else {
+                        knerror $errMsg
+                     }
+                  }
+               }
+            }
+         }
+
+         # register this evaluation on the main one that triggered it (prior
+         # unload evaluation to report correct order with other evaluations)
+         registerModuleEval $context $msgrecid
+
+         # no need to update modnamevr and tags after evaluation as these
+         # information were already complete in persistent environment
+         ##nagelfar ignore Suspicious variable name
+         if {[execute-modulefile $modfile $modname $modnamevr $mod 0 0]} {
+            break
+         }
+
+         # unloading visibility depends on hidden-loaded tag
+         set hidden [isModuleTagged $modname hidden-loaded 1]
+
+         # module was asked by user if tagged loaded instead of auto-loaded
+         set uasked [isModuleTagged $modname loaded 1]
+
+         # unset module from list of loaded modules qualified for refresh eval
+         if {[isModuleRefreshQualified $modname]} {
+            remove-path __MODULES_LMREFRESH $modname
+         }
+
+         # get module position in loaded list to remove corresponding loaded
+         # modulefile (entry at same position in _LMFILES_)
+         # need the unfiltered loaded module list to get correct index
+         set lmidx [lsearch -exact [getLoadedModulePropertyList name 0]\
+            $modname]
+         remove-path LOADEDMODULES $modname
+         remove-path --index _LMFILES_ $lmidx
+         # update cache arrays
+         unsetLoadedModule $modname $modfile
+
+         # unregister declared source-sh
+         if {[set modsrcsh [getLoadedSourceSh $modname 1]] ne {}} {
+            remove-path __MODULES_LMSOURCESH $modsrcsh
+         }
+         unsetLoadedSourceSh $modname
+
+         # unregister declared conflict
+         if {[set modcon [getLoadedConflict $modname 1]] ne {}} {
+            remove-path __MODULES_LMCONFLICT $modcon
+         }
+         unsetLoadedConflict $modname
+
+         # unset prereq declared for this module
+         if {[llength [set modpre [getLoadedPrereq $modname]]] > 0} {
+            remove-path __MODULES_LMPREREQ [getLoadedPrereq $modname 1]
+         }
+         unsetLoadedPrereq $modname
+
+         # unset alternative names declared for this module
+         if {[llength [set modalt [getLoadedAltname $modname]]] >0} {
+            remove-path __MODULES_LMALTNAME [getLoadedAltname $modname 1]
+         }
+         unsetLoadedAltname $modname
+
+         # unset variant declared for this module
+         if {[llength [set modvrspec [getLoadedVariant $modname]]] > 0} {
+            remove-path __MODULES_LMVARIANT [getLoadedVariant $modname 1]
+         }
+         unsetLoadedVariant $modname
+
+         # unset tags declared for this module
+         if {[set modtag [getExportTagList $modname 1]] ne {}} {
+            remove-path __MODULES_LMTAG $modtag
+            # also remove the auto-loaded and keep-loaded tags from
+            # in-memory knowledge not to re-apply them if module is reloaded
+            # in other conditions
+            unsetModuleTag $modname auto-loaded keep-loaded
+            if {$modnamevr ne {} && $modname ne $modnamevr} {
+               unsetModuleTag $modnamevr auto-loaded keep-loaded
+            }
+         }
+         if {[set modtag [getExtraTagList $modname 1]] ne {}} {
+            remove-path __MODULES_LMEXTRATAG $modtag
+            # also remove extra tags from in-memory knowledge not re-apply
+            # them if module is reloaded in other conditions
+            set extratag_list [getExtraTagList $modname]
+            unsetModuleTag $modname {*}$extratag_list
+            unsetModuleExtraTag $modname {*}$extratag_list
+            if {$modnamevr ne {} && $modname ne $modnamevr} {
+               unsetModuleTag $modnamevr {*}$extratag_list
+               unsetModuleExtraTag $modnamevr {*}$extratag_list
+            }
+         }
+
+         if {[getConf auto_handling] && $auto} {
+            # UReqUn modules unload now DepUn+main mods are unloaded
+            if {[llength $urequnlist] > 0} {
+               set urequnlist [lreverse $urequnlist]
+               for {set i 0} {$i < [llength $urequnlist]} {incr i 1} {
+                  set unmod [lindex $urequnlist $i]
+                  ##nagelfar ignore Found constant
+                  if {[cmdModuleUnload urequn match 0 0 0 0 $unmod]} {
+                     # just warn if UReqUn module cannot be unloaded, main
+                     # unload process continues, just the UReqUn modules that
+                     # are required by unmod (whose unload failed) are
+                     # withdrawn from UReqUn module list
+                     reportWarning "Unload of useless requirement\
+                        [getModuleDesignation loaded $unmod] failed" 1
+                     lassign [getDiffBetweenList $urequnlist\
+                        [getRequiredLoadedModuleList [list $unmod]]]\
+                        urequnlist
+                  }
+               }
+            }
+
+            # DepRe modules load phase now DepUn+UReqUn+main mods are unloaded
+            # except if a switch action is ongoing as this DepRe load phase
+            # will occur after the new mod load
+            if {[llength $deprelist] > 0 && ![info exists swprocessing]} {
+               ##nagelfar ignore +2 Found constant
+               reloadModuleListLoadPhase deprelist $depreisuasked $deprevr\
+                  $depreextratag [getState force] {Reload of dependent _MOD_\
+                  failed} depre
+            }
+         }
+
+         # consider evaluation hidden if hidden loaded module was auto loaded
+         # and no specific messages are recorded for this evaluation
+         if {$hidden && !$uasked && ![isMsgRecorded]} {
+            registerModuleEvalHidden $context $msgrecid
+         }
+
+         # report a summary of automated evaluations if no error
+         reportModuleEval
+      } errMsg]] != 0 && $errCode != 4} {
+         # in case of error report module info even if set hidden
+         set hidden 0
+         if {$errMsg ne {}} {
+            reportError $errMsg [expr {![info exists errlocalreport]}]
+         }
+         # report switched-off module unload failure under switch info block
+         # unless the above reportError call already put a mesg to this block
+         if {[info exists swprocessing] && ($errMsg eq {} || [info exists\
+            errlocalreport])} {
+            reportError "Unload of switched-off [getModuleDesignation loaded\
+               $modname] failed" 1
+         }
+         # rollback settings if some evaluation went wrong
+         if {![info exists errharmless]} {
+            set ret 1
+            restoreSettings
+            # remove from successfully evaluated module list
+            registerModuleEval $context $msgrecid $modnamevr unload
+         }
+         unset -nocomplain errlocalreport errharmless
+      }
+      popSettings
+
+      # report all recorded messages for this evaluation (hide evaluation if
+      # loaded mod is set hidden, has been automatically loaded and unloaded)
+      reportMsgRecord "Unloading [getModuleDesignation $msgrecid {} 2]" [expr\
+         {$hidden && !$uasked && [depthState evalid] != 1}]
+      popMsgRecordId
+   }
+   lpopState mode
+
+   return $ret
+}
+
+proc cmdModulePurge {} {
+   # create an eval id to track successful/failed module evaluations
+   pushMsgRecordId purge-[depthState modulename] 0
+
+   # unload one by one to ensure same behavior whatever auto_handling state
+   # force it to handle loaded modules in violation state
+   # remove dependent modules if force mode enabled
+   set onlyndep [expr {![getState force]}]
+   cmdModuleUnload unload match 0 1 0 $onlyndep {*}[lreverse\
+      [getLoadedModulePropertyList name]]
+
+   popMsgRecordId 0
+}
+
+proc cmdModuleReload {args} {
+   # reload all loaded modules if no module list passed
+   if {[llength $args] == 0} {
+      set lmlist [getLoadedModulePropertyList name]
+   } else {
+      set lmlist $args
+   }
+   reportDebug "reloading $lmlist"
+
+   # create an eval id to track successful/failed module evaluations
+   pushMsgRecordId reload-[depthState modulename] 0
+
+   # no reload of all loaded modules attempt if constraints are violated
+   if {[llength $args] == 0 && ![areModuleConstraintsSatisfied]} {
+      reportError {Cannot reload modules, some of their constraints are not\
+         satistied}
+   } else {
+      pushSettings
+      if {[set errCode [catch {
+         # run unload then load-again phases
+         lassign [reloadModuleListUnloadPhase lmlist] isuasked vr extratag
+         reloadModuleListLoadPhase lmlist $isuasked $vr $extratag
+      } errMsg]] == 1} {
+         # rollback settings if some evaluation went wrong
+         restoreSettings
+      }
+      popSettings
+   }
+
+   popMsgRecordId 0
+}
+
+proc cmdModuleAliases {} {
+   # disable error reporting to avoid modulefile errors
+   # to mix with avail results
+   inhibitErrorReport
+
+   # parse paths to fill g_moduleAlias and g_moduleVersion
+   foreach dir [getModulePathList exiterronundef] {
+      getModules $dir {} 0 {}
+   }
+
+   setState inhibit_errreport 0
+
+   set display_list {}
+   foreach name [lsort -dictionary [array names ::g_moduleAlias]] {
+      # exclude hidden aliases from result
+      if {![isModuleHidden $name]} {
+         lappend display_list "[sgr al $name] -> $::g_moduleAlias($name)"
+      }
+   }
+   displayElementList Aliases hi sepline 1 0 0 $display_list
+
+   set display_list {}
+   foreach name [lsort -dictionary [array names ::g_moduleVersion]] {
+      # exclude hidden versions or versions targeting an hidden module
+      if {![isModuleHidden $name] && ![isModuleHidden\
+         $::g_moduleVersion($name)]} {
+         lappend display_list "[sgr sy $name] -> $::g_moduleVersion($name)"
+      }
+   }
+   displayElementList Versions hi sepline 1 0 0 $display_list
+}
+
+proc cmdModuleAvail {show_oneperline show_mtime show_filter search_filter\
+   search_match args} {
+   if {[llength $args] == 0} {
+      lappend args *
+   }
+
+   if {$show_mtime || $show_oneperline} {
+      set one_per_line 1
+      set hstyle terse
+      set theader_cols [list hi Package/Alias 39 Versions 19 {Last mod.} 19]
+   } else {
+      set one_per_line 0
+      set hstyle sepline
+      set theader_cols {}
+   }
+
+   # set a default filter (do not print dirs with no sym) if none set
+   if {$show_filter eq {}} {
+      set show_filter noplaindir
+   }
+
+   # elements to include in output
+   set report_modulepath [isEltInReport modulepath]
+
+   # consolidate search filters
+   lappend search_filter $search_match wild
+   set search_rc_filter $search_filter
+   lappend search_rc_filter rc_alias_only
+
+   # disable error reporting to avoid modulefile errors
+   # to mix with avail results
+   inhibitErrorReport
+
+   foreach mod $args {
+      set search_queries [list $mod]
+      array unset mod_list
+      # look if aliases have been defined in the global or user-specific
+      # modulerc and display them if any in a dedicated list
+      array set mod_list [getModules {} $mod $show_mtime $search_rc_filter\
+         $show_filter]
+
+      if {$report_modulepath} {
+         reportModules $search_queries {global/user modulerc} hi $hstyle\
+            $show_mtime 0 $one_per_line $theader_cols hidden-loaded
+      }
+
+      foreach dir [getModulePathList exiterronundef] {
+         if {$report_modulepath} {
+            array unset mod_list
+            # get module list (process full dir content and do not exit when
+            # err is raised from a modulerc)
+            array set mod_list [getModules $dir $mod $show_mtime\
+               $search_filter $show_filter]
+            set modpath_label [getModulepathLabel $dir]
+            reportModules $search_queries $modpath_label mp $hstyle\
+               $show_mtime 0 $one_per_line $theader_cols hidden-loaded
+         } else {
+            # add result if not already added from an upper priority modpath
+            foreach {elt props} [getModules $dir $mod $show_mtime\
+               $search_filter $show_filter] {
+               if {![info exists mod_list($elt)]} {
+                  set mod_list($elt) $props
+               }
+            }
+         }
+      }
+
+      # no report by modulepath, mix all aggregated results
+      if {!$report_modulepath} {
+         reportModules $search_queries noheader {} {} $show_mtime 0\
+            $one_per_line $theader_cols hidden-loaded
+      }
+   }
+
+   # display output key
+   if {!$show_mtime && ![isStateEqual report_format json] && [isEltInReport\
+      key]} {
+      displayKey
+   }
+
+   setState inhibit_errreport 0
+}
+
+proc runModuleUse {cmd mode pos args} {
+   if {$args eq {}} {
+      showModulePath
+   } else {
+      if {$pos eq {remove}} {
+         # get current module path list
+         set modpathlist [getModulePathList returnempty 0 0]
+      }
+
+      foreach path $args {
+         switch -glob -- $path {
+            --remove-on-unload - --append-on-unload - --prepend-on-unload -\
+            --noop-on-unload {
+               if {$cmd ne {unuse}} {
+                  knerror "Invalid option '$path'"
+               } else {
+                  lappend pathlist $path
+               }
+            }
+            -* {
+               knerror "Invalid option '$path'"
+            }
+            {} {
+               reportError [getEmptyNameMsg directory]
+            }
+            $* {
+               lappend pathlist $path
+            }
+            default {
+               if {$pos eq {remove}} {
+                  if {$path in $modpathlist} {
+                     lappend pathlist $path
+                  # transform given path in an absolute path which should have
+                  # been registered in the MODULEPATH env var. however for
+                  # compatibility with previous behavior where relative paths
+                  # were registered in MODULEPATH given path is first checked
+                  # against current path list
+                  } elseif {[set abspath [getAbsolutePath $path]] in\
+                     $modpathlist} {
+                     lappend pathlist $abspath
+                  # even if not found, transmit this path to remove-path in
+                  # case several path elements have been joined as one string
+                  } else {
+                     lappend pathlist $path
+                  }
+               } else {
+                  # transform given path in an absolute path to avoid
+                  # dependency to the current work directory. except if this
+                  # path starts with a variable reference
+                  lappend pathlist [getAbsolutePath $path]
+               }
+            }
+         }
+      }
+
+      # added directory may not exist at this time
+      # pass all paths specified at once to append-path/prepend-path
+      if {[info exists pathlist]} {
+         set optlist [list]
+         # define path command to call
+         set pathcmd [expr {$pos eq {remove} ? {unload-path} : {add-path}}]
+
+         # by-pass any reference counter in case use is called from top level
+         # not to increase reference counter if paths are already defined
+         if {[isTopEvaluation]} {
+            lappend optlist --ignore-refcount
+         }
+
+         if {[isTopEvaluation]} {
+            ##nagelfar ignore Found constant
+            lappendState mode load
+         }
+         $pathcmd $pos-path $mode $pos {*}$optlist MODULEPATH {*}$pathlist
+         if {[isTopEvaluation]} {
+            ##nagelfar ignore Found constant
+            lpopState mode
+         }
+      }
+   }
+}
+
+proc cmdModuleUse {mode pos args} {
+   if {$mode eq {unload}} {
+      set pos remove
+   }
+   runModuleUse use $mode $pos {*}$args
+}
+
+proc cmdModuleUnuse {mode args} {
+   runModuleUse unuse $mode remove {*}$args
+}
+
+proc cmdModuleAutoinit {} {
+   # skip autoinit process if found already ongoing in current environment
+   if {[get-env __MODULES_AUTOINIT_INPROGRESS] eq {1}} {
+      return
+   }
+
+   # set environment variable to state autoinit process is ongoing
+   setenv __MODULES_AUTOINIT_INPROGRESS 1
+
+   # flag to make renderSettings define the module command
+   setState autoinit 1
+
+   # initialize env variables around module command
+   lappendState mode load
+
+   # register command location
+   setenv MODULES_CMD [getAbsolutePath $::argv0]
+
+   # define current Modules version if versioning enabled
+   @VERSIONING@if {![info exists ::env(MODULE_VERSION)]} {
+   @VERSIONING@   setenv MODULE_VERSION @MODULES_RELEASE@@MODULES_BUILD@
+   @VERSIONING@   setenv MODULE_VERSION_STACK @MODULES_RELEASE@@MODULES_BUILD@
+   @VERSIONING@}
+
+   # initialize MODULEPATH and LOADEDMODULES if found unset
+   if {![info exists ::env(MODULEPATH)]} {
+      setenv MODULEPATH {}
+   }
+   if {![info exists ::env(LOADEDMODULES)]} {
+      setenv LOADEDMODULES {}
+   }
+
+   # initialize user environment if found undefined (both MODULEPATH and
+   # LOADEDMODULES empty)
+   if {[get-env MODULEPATH] eq {} && [get-env LOADEDMODULES] eq {}} {
+      # set modpaths defined in modulespath config file if it exists
+      # use .modulespath file in initdir if conf file are located in this dir
+      if {[file readable {@modulespath@}]} {
+         set fdata [split [readFile {@modulespath@}] \n]
+         foreach fline $fdata {
+            if {[regexp {^\s*(.*?)\s*(#.*|)$} $fline match patharg] == 1\
+               && $patharg ne {}} {
+               foreach path [split $patharg :] {
+                  # resolve path directory in case wildcard character used
+                  set globlist [glob -types d -nocomplain $path]
+                  if {[llength $globlist] == 0} {
+                     lappend pathlist $path
+                  } else {
+                     lappend pathlist {*}$globlist
+                  }
+               }
+            }
+         }
+         if {[info exists pathlist]} {
+            cmdModuleUse load append {*}$pathlist
+         }
+      }
+
+      # source initialization initrc after modulespaths if it exists
+      # use modulerc file in initdir if conf files are located in this dir
+      if {[file exists {@initrc@}]} {
+         lappendState commandname source
+         cmdModuleSource load {@initrc@}
+         lpopState commandname
+      }
+
+      # record what has just been loaded in the virtual init collection
+      setenv __MODULES_LMINIT [getLoadedInit]
+   # if user environment is already initialized, refresh the already loaded
+   # modules unless if environment is inconsistent
+   } elseif {![catch {cacheCurrentModules}]} {
+      cmdModuleRefresh
+   }
+
+   # default MODULESHOME
+   setenv MODULESHOME [getConf home]
+
+   # append dir where to find module function for ksh (to get it defined in
+   # interactive and non-interactive sub-shells). also applies for shells
+   # listed in shells_with_ksh_fpath conf
+   if {[getState shell] in [list {*}[split [getConf shells_with_ksh_fpath] :]\
+      ksh]} {
+      append-path FPATH {@initdir@/ksh-functions}
+   }
+
+   # define Modules init script as shell startup file
+   if {[getConf set_shell_startup] && [getState shelltype] in [list sh csh\
+      fish]} {
+      # setup ENV variables to get module defined in sub-shells (works for
+      # 'sh' and 'ksh' in interactive mode and 'sh' (zsh-compat), 'bash' and
+      # 'ksh' (zsh-compat) in non-interactive mode.
+      setenv ENV {@initdir@/profile.sh}
+      setenv BASH_ENV {@initdir@/bash}
+   }
+
+   if {[getState shelltype] in {sh csh fish}} {
+      # add Modules bin directory to PATH if enabled but do not increase ref
+      # counter variable if already there
+      @setbinpath@if {{@bindir@} ni [split [get-env PATH] :]} {
+         @setbinpath@@appendbinpath@-path --ignore-refcount PATH {@bindir@}
+      @setbinpath@}
+
+      # add Modules man directory to MANPATH if enabled
+      # initialize MANPATH if not set with a value that preserves manpath
+      # system configuration even after addition of paths to this variable by
+      # modulefiles
+      @setmanpath@set manpath {}
+      # use manpath tool if found at configure step, use MANPATH otherwise
+      ##nagelfar ignore +2 Too long line
+      ##nagelfar ignore Found constant
+      @setmanpath@@usemanpath@catch {set manpath [exec -ignorestderr 2>/dev/null manpath]}
+      @setmanpath@@notusemanpath@if {[info exists ::env(MANPATH)]} {
+      @setmanpath@@notusemanpath@   set manpath $::env(MANPATH)
+      @setmanpath@@notusemanpath@}
+      @setmanpath@if {{@mandir@} ni [split $manpath :]} {
+      @setmanpath@   if {![info exists ::env(MANPATH)]} {
+      @setmanpath@      append-path MANPATH {}
+      @setmanpath@   # ensure no duplicate ':' is set
+      @setmanpath@   } elseif {[get-env MANPATH] eq {:}} {
+      @setmanpath@      remove-path MANPATH {}
+      @setmanpath@      append-path MANPATH {}
+      @setmanpath@   }
+      @setmanpath@   @appendmanpath@-path MANPATH {@mandir@}
+      @setmanpath@}
+   }
+
+   # source shell completion script if available, not installed in default
+   # completion locations and only if shell is interactive
+   if {[getState shell] in {@shellcompsource@} && [getState is_stderr_tty]} {
+      set compfile "@initdir@/[getState shell]_completion"
+      if {[file readable $compfile]} {
+         putsModfileCmd dummy "source '$compfile';"
+      }
+   }
+
+   # clear in progress flag
+   unsetenv __MODULES_AUTOINIT_INPROGRESS
+
+   lpopState mode
+}
+
+proc cmdModuleInit {args} {
+   set init_cmd [lindex $args 0]
+   set init_list [lrange $args 1 end]
+   set notdone 1
+   set nomatch 1
+
+   # Define startup files for each shell
+   set files(csh) [list .modules .cshrc .cshrc_variables .login]
+   set files(tcsh) [list .modules .tcshrc .cshrc .cshrc_variables .login]
+   set files(sh) [list .modules .bash_profile .bash_login .profile .bashrc]
+   set files(bash) $files(sh)
+   set files(ksh) $files(sh)
+   set files(fish) [list .modules .config/fish/config.fish]
+   set files(zsh) [list .modules .zshrc .zshenv .zlogin]
+
+   # Process startup files for this shell
+   set current_files $files([getState shell])
+   foreach filename $current_files {
+      if {$notdone} {
+         set filepath $::env(HOME)
+         append filepath / $filename
+
+         reportDebug "Looking at $filepath"
+         if {[file readable $filepath] && [file isfile $filepath]} {
+            set newinit {}
+            set thismatch 0
+
+            foreach curline [split [readFile $filepath] \n] {
+               # Find module load/add command in startup file
+               set comments {}
+               if {$notdone && [regexp {^([ \t]*module[ \t]+(load|add)[\
+                  \t]*)(.*)} $curline match cmd subcmd modules]} {
+                  set nomatch 0
+                  set thismatch 1
+                  regexp {([ \t]*\#.+)} $modules match comments
+                  regsub {\#.+} $modules {} modules
+
+                  # remove existing references to the named module from
+                  # the list Change the module command line to reflect the
+                  # given command
+                  switch -- $init_cmd {
+                     list {
+                        if {![info exists notheader]} {
+                           report "[getState shell] initialization file\
+                              \$HOME/$filename loads modules:"
+                           set notheader 0
+                        }
+                        report \t$modules
+                     }
+                     add {
+                        foreach newmodule $init_list {
+                           set modules [replaceFromList $modules $newmodule]
+                        }
+                        lappend newinit "$cmd$modules $init_list$comments"
+                        # delete new modules in potential next lines
+                        set init_cmd rm
+                     }
+                     prepend {
+                        foreach newmodule $init_list {
+                           set modules [replaceFromList $modules $newmodule]
+                        }
+                        lappend newinit "$cmd$init_list $modules$comments"
+                        # delete new modules in potential next lines
+                        set init_cmd rm
+                     }
+                     rm {
+                        set oldmodcount [llength $modules]
+                        foreach oldmodule $init_list {
+                           set modules [replaceFromList $modules $oldmodule]
+                        }
+                        set modcount [llength $modules]
+                        lappend newinit [expr {$modcount > 0 ?\
+                           "$cmd$modules$comments" : [string trim $cmd]}]
+                        if {$oldmodcount > $modcount} {
+                           set notdone 0
+                        }
+                     }
+                     switch {
+                        set oldmodule [lindex $init_list 0]
+                        set newmodule [lindex $init_list 1]
+                        set newmodules [replaceFromList $modules\
+                           $oldmodule $newmodule]
+                        lappend newinit $cmd$newmodules$comments
+                        if {$modules ne $newmodules} {
+                           set notdone 0
+                        }
+                     }
+                     clear {
+                        lappend newinit [string trim $cmd]
+                     }
+                  }
+               } elseif {$curline ne {}} {
+                  # copy the line from the old file to the new
+                  lappend newinit $curline
+               }
+            }
+
+            if {$init_cmd ne {list} && $thismatch} {
+               reportDebug "Writing $filepath"
+               if {[catch {
+                  set fid [open $filepath w]
+                  puts $fid [join $newinit \n]
+                  close $fid
+               } errMsg ]} {
+                  reportErrorAndExit "Init file $filepath cannot be\
+                     written.\n$errMsg"
+               }
+            }
+         }
+      }
+   }
+
+   # quit in error if command was not performed due to no match
+   if {$nomatch && $init_cmd ne {list}} {
+      reportErrorAndExit "Cannot find a 'module load' command in any of the\
+         '[getState shell]' startup files"
+   }
+}
+
+# provide access to modulefile specific commands from the command-line, making
+# them standing as a module sub-command (see module procedure)
+proc cmdModuleResurface {cmd args} {
+   lappendState mode load
+   lappendState commandname $cmd
+
+   set optlist [list]
+   switch -- $cmd {
+      prepend-path - append-path - remove-path {
+         # by-pass any reference counter, as call is from top level
+         # append/prepend-path: not to increase reference counter if paths are
+         # already defined. remove-path: to ensure paths are removed whatever
+         # their reference counter value
+         lappend optlist --ignore-refcount
+      }
+   }
+
+   # run modulefile command and get its result
+   if {[catch {$cmd {*}$optlist {*}$args} res]} {
+      # report error if any and return false
+      reportError $res
+   } else {
+      # register result depending of return kind (false or text)
+      switch -- $cmd {
+         module-info {
+            set ::g_return_text $res
+         }
+         default {
+            if {$res == 0} {
+               # render false if command returned false
+               setState return_false 1
+            }
+         }
+      }
+   }
+
+   lpopState commandname
+   lpopState mode
+}
+
+proc cmdModuleTest {args} {
+   lappendState mode test
+   set first_report 1
+   foreach mod $args {
+      lassign [getPathToModule $mod] modfile modname modnamevr
+      if {$modfile ne {}} {
+         # only one separator lines between 2 modules
+         if {$first_report} {
+            displaySeparatorLine
+            set first_report 0
+         }
+         report "Module Specific Test for [sgr hi $modfile]:\n"
+         execute-modulefile $modfile $modname modnamevr $mod
+         displaySeparatorLine
+      }
+   }
+   lpopState mode
+}
+
+proc cmdModuleClear {args} {
+   # fetch confirmation if no arg passed and force mode disabled
+   if {[llength $args] == 0 && ![getState force]} {
+      # ask for it if stdin is attached to a terminal
+      if {![catch {fconfigure stdin -mode}]} {
+         report "Are you sure you want to clear all loaded modules!? \[n\] " 1
+         flush [getState reportfd]
+      }
+      # fetch stdin content even if not attached to terminal in case some
+      # content has been piped to this channel
+      set doit [gets stdin]
+   } else {
+      set doit [lindex $args 0]
+   }
+
+   # should be confirmed or forced to proceed
+   if {[string equal -nocase -length 1 $doit y] || [getState force]} {
+      lappendState mode load
+      # unset all Modules runtime variables
+      foreach globvar [getModulesEnvVarGlobList 1] {
+         foreach var [array names ::env -glob $globvar] {
+            unset-env $var
+         }
+      }
+      lpopState mode
+   } else {
+      reportInfo "Modules runtime information were not cleared"
+   }
+}
+
+proc cmdModuleState {args} {
+   if {[llength $args] > 0} {
+      set name [lindex $args 0]
+   }
+
+   if {[info exists name] && $name ni [concat [array names ::g_state_defs]\
+      [array names ::g_states]]} {
+      knerror "State '$name' does not exist"
+   }
+
+   # report module version unless if called by cmdModuleConfig
+   if {[getCallingProcName] ne {cmdModuleConfig}} {
+      reportVersion
+      reportSeparateNextContent
+   }
+
+   displayTableHeader hi {State name} 24 {Value} 54
+
+   # fetch specified state or all states
+   if {[info exists name]} {
+      if {$name in [array names ::g_state_defs]} {
+         set stateval($name) [getState $name <undef> 1]
+      } else {
+         set stateval($name) [getState $name]
+      }
+   } else {
+      # define each attribute/fetched state value pair
+      foreach state [array names ::g_state_defs] {
+         set stateval($state) [getState $state <undef> 1]
+      }
+      # also get dynamic states (with no prior definition)
+      foreach state [array names ::g_states] {
+         if {![info exists stateval($state)]} {
+            set stateval($state) [getState $state]
+         }
+      }
+   }
+
+   foreach state [lsort [array names stateval]] {
+      append displist [format {%-25s %s} $state $stateval($state)] \n
+   }
+   report $displist 1
+   reportSeparateNextContent
+
+   # only report specified state if any
+   if {[info exists name]} {
+      return
+   }
+
+   # report environment variable set related to Modules
+   displayTableHeader hi {Env. variable} 24 {Value} 54
+   set envvar_list {}
+   foreach var [getModulesEnvVarGlobList] {
+      lappend envvar_list {*}[array names ::env -glob $var]
+   }
+   unset displist
+   foreach var [lsort -unique $envvar_list] {
+      append displist [format {%-25s %s} $var $::env($var)] \n
+   }
+   report $displist 1
+}
+
+proc cmdModuleConfig {dump_state args} {
+   # parse arguments
+   set nameunset 0
+   switch -- [llength $args] {
+      1 {
+         lassign $args name
+      }
+      2 {
+         lassign $args name value
+         # check if configuration should be set or unset
+         if {$name eq {--reset}} {
+            set name $value
+            set nameunset 1
+            unset value
+         }
+      }
+   }
+
+   reportDebug "dump_state='$dump_state', reset=$nameunset,\
+      name=[expr {[info exists name] ? "'$name'" : {<undef>}}], value=[expr\
+      {[info exists value] ? "'$value'" : {<undef>}}]"
+
+   foreach option [array names ::g_config_defs] {
+      lassign $::g_config_defs($option) confvar($option) defval\
+         conflockable($option) confkind($option) confvalid($option) vtrans\
+         initproc confvalidkind($option)
+      set confval($option) [getConf $option <undef>]
+      set confvtrans($option) {}
+      for {set i 0} {$i < [llength $vtrans]} {incr i} {
+         lappend confvtrans($option) [lindex $vtrans $i] [lindex\
+            $confvalid($option) $i]
+      }
+   }
+
+   # catch any environment variable set for modulecmd run-time execution
+   foreach runenvvar [array names ::env -glob MODULES_RUNENV_*] {
+      set runenvconf [string tolower [string range $runenvvar 8 end]]
+      set confval($runenvconf) [get-env $runenvvar]
+      # enable modification of runenv conf
+      set confvar($runenvconf) $runenvvar
+      set confvalid($runenvconf) {}
+      set conflockable($runenvconf) {}
+      set confkind($runenvconf) s
+      set confvtrans($runenvconf) {}
+      set confvalidkind($runenvconf) {}
+   }
+
+   if {[info exists name] && ![info exists confval($name)]} {
+      reportErrorAndExit "Configuration option '$name' does not exist"
+   # set configuration
+   } elseif {[info exists name] && ($nameunset || [info exists value])} {
+      # append or subtract value to existing configuration value if new value
+      # starts with '+' or '-' (for colon-separated list option only)
+      if {[info exists value] && $confkind($name) eq {l}} {
+         set curconfvallist [split [getConf $name] :]
+         switch -- [string index $value 0] {
+            + {
+               appendNoDupToList curconfvallist {*}[split [string range\
+                  $value 1 end] :]
+               set value [join $curconfvallist :]
+            }
+            - {
+               lassign [getDiffBetweenList $curconfvallist [split [string\
+                  range $value 1 end] :]] curconfvallist
+               set value [join $curconfvallist :]
+            }
+         }
+      }
+
+      if {$confvar($name) eq {}} {
+         reportErrorAndExit "Configuration option '$name' cannot be altered"
+      } elseif {$conflockable($name) eq {1} && [isConfigLocked $name]} {
+         reportErrorAndExit "Configuration option '$name' is locked"
+      } elseif {$nameunset} {
+         # unset configuration variable
+         lappendState mode load
+         unsetenv $confvar($name)
+         lpopState mode
+      } elseif {[llength $confvalid($name)] > 0} {
+         switch -- $confvalidkind($name) {
+            eltlist {
+               # check each element in value list
+               if {[isDiffBetweenList [split $value :] $confvalid($name)]} {
+                  reportErrorAndExit "Invalid element in value list for\
+                     config. option '$name'\nAllowed elements are:\
+                     $confvalid($name) (separated by ':')"
+               } else {
+                  set validval 1
+               }
+            }
+            intbe {
+               if {[string is integer -strict $value] && $value >= [lindex\
+                  $confvalid($name) 0] && $value <= [lindex $confvalid($name)\
+                  1]} {
+                  set validval 1
+               } else {
+                  reportErrorAndExit "Invalid value for configuration option\
+                     '$name'\nValue should be an integer comprised between\
+                     [lindex $confvalid($name) 0] and [lindex\
+                     $confvalid($name) 1]"
+               }
+            }
+            {} {
+               ##nagelfar ignore +2 Non static subcommand
+               if {([llength $confvalid($name)] == 1 && ![string is\
+                  $confvalid($name) -strict $value]) || ([llength\
+                  $confvalid($name)] > 1 && $value ni $confvalid($name))} {
+                  reportErrorAndExit "Valid values for configuration option\
+                     '$name' are: $confvalid($name)"
+               } else {
+                  set validval 1
+               }
+            }
+         }
+      } else {
+         set validval 1
+      }
+
+      if {[info exists validval]} {
+         # effectively set configuration variable
+         lappendState mode load
+         setenv $confvar($name) $value
+         lpopState mode
+      }
+      # clear cached value for config if any
+      unsetConf $name
+   # report configuration
+   } else {
+      reportVersion
+      reportSeparateNextContent
+      displayTableHeader hi {Config. name} 24 {Value (set by if default\
+         overridden)} 54
+
+      # report all configs or just queried one
+      if {[info exists name]} {
+         set varlist [list $name]
+      } else {
+         set varlist [lsort [array names confval]]
+      }
+
+      foreach var $varlist {
+         ##nagelfar ignore +2 Suspicious variable name
+         set valrep [displayConfig $confval($var) $confvar($var) [info exists\
+            ::asked_$var] $confvtrans($var) [expr {$conflockable($var) eq {1}\
+            && [isConfigLocked $var]}]]
+         append displist [format {%-25s %s} $var $valrep] \n
+      }
+      report $displist 1
+      reportSeparateNextContent
+
+      if {$dump_state} {
+         cmdModuleState
+      }
+   }
+}
+
+proc cmdModuleShToMod {args} {
+   set scriptargs [lassign $args shell script]
+
+   # evaluate script and get the environment changes it performs translated
+   # into modulefile commands
+   set modcontent [sh-to-mod {*}$args]
+
+   # output resulting modulefile
+   if {[llength $modcontent] > 0} {
+      report "#%Module"
+      # format each command with tabs and colors if enabled
+      foreach modcmd $modcontent {
+         reportCmd -nativeargrep {*}$modcmd
+      }
+   }
+}
+
+proc cmdModuleEdit {mod} {
+   lassign [getPathToModule $mod] modfile modname
+
+   # error message has already been produced if mod not found or forbidden
+   if {$modfile ne {}} {
+      # redirect stdout to stderr as stdout is evaluated by module shell func
+      if {[catch {runCommand [getConf editor] $modfile >@stderr 2>@stderr}\
+         errMsg]} {
+         # re-throw error but as an external one (not as a module issue)
+         knerror $errMsg
+      }
+   }
+}
+
+proc cmdModuleRefresh {} {
+   lappendState mode refresh
+   # create an eval id to track successful/failed module evaluations
+   pushMsgRecordId refresh-[depthState modulename] 0
+
+   # load variants from loaded modules
+   cacheCurrentModules
+
+   foreach lm [getLoadedModulePropertyList refresh] {
+      # prepare info to execute modulefile
+      set vrlist [getVariantList $lm 1]
+      if {[llength $vrlist] > 0} {
+         lassign [parseModuleSpecification 0 0 0 0 $lm {*}$vrlist] lmvr
+      } else {
+         set lmvr $lm
+      }
+      set lmfile [getModulefileFromLoadedModule $lm]
+      set taglist [getExportTagList $lm]
+
+      # refreshing module is visible by default
+      set hidden 0
+      set uasked 1
+
+      # set a unique id to record messages related to this evaluation.
+      set msgrecid refresh-$lmvr-[depthState modulename]
+
+      # register record message unique id (now we know mod will be evaluated)
+      pushMsgRecordId $msgrecid
+
+      # record module title (with the variants and tags of loaded module)
+      # prior module evaluation to get this title ready in case of eval error
+      registerModuleDesignation $msgrecid $lm [getVariantList $lm 7]\
+         $taglist
+
+      # run modulefile, restore settings prior evaluation if error and
+      # continue to evaluate the remaining loaded modules
+      pushSettings
+      if {[set errCode [catch {
+         if {[execute-modulefile $lmfile $lm lmvr $lm]} {
+            break
+         }
+
+         # unloading visibility depends on hidden-loaded tag
+         set hidden [isModuleTagged $lm hidden-loaded 1]
+
+         # module was asked by user if tagged loaded instead of auto-loaded
+         set uasked [isModuleTagged $lm loaded 1]
+      } errMsg]] != 0 && $errCode != 4} {
+         restoreSettings
+      }
+      popSettings
+
+      # report all recorded messages for this evaluation (hide evaluation if
+      # loaded mod is set hidden, has been automatically loaded and unloaded)
+      reportMsgRecord "Refreshing [getModuleDesignation $msgrecid {} 2]"\
+         [expr {$hidden && !$uasked && [depthState evalid] != 1}]
+      popMsgRecordId
+   }
+
+   popMsgRecordId 0
+   lpopState mode
+}
+
+proc cmdModuleHelp {args} {
+   lappendState mode help
+   set first_report 1
+   foreach arg $args {
+      lassign [getPathToModule $arg] modfile modname modnamevr
+
+      if {$modfile ne {}} {
+         # only one separator lines between 2 modules
+         if {$first_report} {
+            displaySeparatorLine
+            set first_report 0
+         }
+         report "Module Specific Help for [sgr hi $modfile]:\n"
+         execute-modulefile $modfile $modname modnamevr $arg
+         displaySeparatorLine
+      }
+   }
+   lpopState mode
+   if {[llength $args] == 0} {
+      reportUsage
+   }
+}
+
+proc cmdModuleTag {unset_extra uasked tag_list args} {
+   reportDebug "tagging $args (unset_extra=$unset_extra, uasked=$uasked,\
+      tag_list=$tag_list)"
+
+   set ret 0
+   foreach mod $args {
+      # find mod among loaded modules
+      lassign [getPathToModule $mod {} 1 match] modfile modname modnamevr\
+         errkind
+
+      if {$modfile eq {}} {
+         set ret 1
+         # go to next module to unload
+         continue
+      }
+
+      # record tags not already set and if asked unset extra tags not set
+      # anymore
+      lassign [getDiffBetweenList $tag_list [getTagList $modname]] diff_list
+      lassign [getDiffBetweenList [getExtraTagList $modname] $tag_list] \
+         unset_list
+      if {[llength $diff_list] > 0 || ($unset_extra && [llength $unset_list]\
+         > 0)} {
+         # set a unique id to record messages related to this evaluation.
+         set msgrecid tag-$modnamevr-[depthState modulename]
+         pushMsgRecordId $msgrecid
+         # record module title (with the variant but no tag list) prior
+         # evaluation to get this title ready in case of error
+         registerModuleDesignation $msgrecid $modname [getVariantList\
+            $modnamevr 7] {}
+
+         lappendState mode unload
+         # first unset tags declared for this module on LM env var
+         if {[set modtag [getExportTagList $modname 1]] ne {}} {
+            remove-path __MODULES_LMTAG $modtag
+         }
+         if {[set modtag [getExtraTagList $modname 1]] ne {}} {
+            remove-path __MODULES_LMEXTRATAG $modtag
+         }
+         lpopState mode
+
+         # remove extra tags currently set not part of tag list if asked
+         if {$unset_extra && [llength $unset_list] > 0} {
+            unsetModuleTag $modname {*}$unset_list
+            unsetModuleExtraTag $modname {*}$unset_list
+            if {$modnamevr ne {} && $modname ne $modnamevr} {
+               unsetModuleTag $modnamevr {*}$unset_list
+               unsetModuleExtraTag $modnamevr {*}$unset_list
+            }
+         }
+
+         # ensure auto-loaded tag is not preserved if not part of target tags
+         if {$unset_extra && {auto-loaded} ni $tag_list} {
+            unsetModuleTag $modname auto-loaded
+            if {$modnamevr ne {} && $modname ne $modnamevr} {
+               unsetModuleTag $modnamevr auto-loaded
+            }
+         }
+
+         # record new tags as extra tag excluding tags relative to the way
+         # module is loaded (auto, keep)
+         lassign [getDiffBetweenList $diff_list [list auto-loaded\
+            keep-loaded]] extradiff_list
+         setModuleTag $modname {*}$diff_list
+         if {[llength $extradiff_list] > 0} {
+            setModuleExtraTag $modname {*}$extradiff_list
+         }
+         if {$modnamevr ne {} && $modname ne $modnamevr} {
+            setModuleTag $modnamevr {*}$diff_list
+            if {[llength $extradiff_list] > 0} {
+               setModuleExtraTag $modnamevr {*}$extradiff_list
+            }
+         }
+
+         # set the new tag set for module on LM env var
+         lappendState mode load
+         if {[set modtag [getExportTagList $modnamevr 1]] ne {}} {
+            append-path __MODULES_LMTAG $modtag
+         }
+         if {[set modtag [getExtraTagList $modnamevr 1]] ne {}} {
+            append-path __MODULES_LMEXTRATAG $modtag
+         }
+         lpopState mode
+
+         # update module designation now the additional tags are set
+         registerModuleDesignation $msgrecid $modname [getVariantList\
+            $modname 7] [getExportTagList $modname]
+         # report tagging evaluation unless hidden and auto-loaded
+         set hidden [isModuleTagged $modnamevr hidden-loaded 1]
+         reportMsgRecord "Tagging [getModuleDesignation $msgrecid {} 2]"\
+            [expr {$hidden && !$uasked}]
+         popMsgRecordId
+
+         # indicates that new tags have been applied
+         set ret 2
+      }
+   }
+
+   return $ret
+}
+
+proc cmdModuleLint {args} {
+   # stop if no linter defined
+   if {[llength [getConf tcl_linter]] == 0} {
+      knerror {No Tcl linter program configured}
+   }
+
+   # extract linter program name
+   set linter [file rootname [file tail [lindex [getConf tcl_linter] 0]]]
+   # build command line
+   set linter_mfile [getConf tcl_linter]
+   set linter_mrc [getConf tcl_linter]
+   set linter_gmrc [getConf tcl_linter]
+   # add module-specific syntax database in addition to regular Tcl one
+   @nagelfaraddons@if {$linter eq {nagelfar}} {
+   @nagelfaraddons@   lappend linter_mfile -s _\
+   @nagelfaraddons@      -s {@nagelfardatadir@/syntaxdb_modulefile.tcl}\
+   @nagelfaraddons@      -plugin {@nagelfardatadir@/plugin_modulefile.tcl}
+   @nagelfaraddons@   lappend linter_mrc -s _\
+   @nagelfaraddons@      -s {@nagelfardatadir@/syntaxdb_modulerc.tcl}\
+   @nagelfaraddons@      -plugin {@nagelfardatadir@/plugin_modulerc.tcl}
+   @nagelfaraddons@   lappend linter_gmrc -s _\
+   @nagelfaraddons@      -s {@nagelfardatadir@/syntaxdb_modulefile.tcl}\
+   @nagelfaraddons@      -plugin {@nagelfardatadir@/plugin_globalrc.tcl}
+   @nagelfaraddons@}
+   set global_rclist [getGlobalRcFileList]
+
+   set modfilelist {}
+   # fetch every available modulefiles if no argument provided
+   if {[llength $args] == 0} {
+      # add global RC files
+      foreach rc $global_rclist {
+         set tolint($rc) gmrc
+      }
+
+      inhibitErrorReport
+      foreach dir [getModulePathList exiterronundef] {
+         # fetch all existing rc file current user has access to
+         foreach {elt props} [findModules $dir * 0 0] {
+            switch -- [lindex $props 0] {
+               modulerc {
+                  set tolint($dir/$elt) mrc
+               }
+            }
+         }
+         # collect all modulefile from dir that current user has access to
+         # getModules will reuse the result collected for findModules
+         foreach {elt props} [getModules $dir *] {
+            switch -- [lindex $props 0] {
+               modulefile - virtual {
+                  set tolint([lindex $props 2]) mfile
+               }
+            }
+         }
+      }
+      setState inhibit_errreport 0
+   } else {
+      foreach mod $args {
+         lassign [getPathToModule $mod] modfile modname modnamevr
+         # error mesg has already been produced if mod not found or forbidden
+         if {$modfile ne {}} {
+            if {$modfile in $global_rclist} {
+               set mkind gmrc
+            } elseif {[file tail $modfile] in {.modulerc .version}} {
+               set mkind mrc
+            } else {
+               set mkind mfile
+            }
+            set tolint($modfile) $mkind
+         }
+      }
+   }
+
+   # execute linter program over every gathered file
+   foreach lintfile [lsort -dictionary [array names tolint]] {
+      # set a record message unique id and record modulefile title
+      set msgrecid lint-$lintfile
+      pushMsgRecordId $msgrecid
+      registerModuleDesignation $msgrecid $lintfile {} {}
+
+      ##nagelfar ignore Suspicious variable name
+      if {[catch {set out [runCommand {*}[set linter_$tolint($lintfile)]\
+         $lintfile]} errMsg]} {
+         # re-throw error but as an external one (not as a module issue)
+         knerror $errMsg
+      }
+
+      # report linting messages
+      displayLinterOutput $linter $out
+
+      # report all lint messages for this modulefile
+      reportMsgRecord "Linting [getModuleDesignation $msgrecid {} 2]"
+      popMsgRecordId
+   }
+}
+
+proc cmdModuleModToSh {shell args} {
+   # save shell modulecmd is initialized to
+   ##nagelfar ignore Found constant
+   setState modtosh_real_shell [getState shell]
+
+   # set shell and shellType states to mod-to-sh target value
+   if {$shell ni [getState supported_shells]} {
+      reportErrorAndExit "Unsupported shell type \'$shell\'"
+   }
+   ##nagelfar ignore Found constant
+   setState shell $shell
+   unsetState shelltype
+
+   # silence message report (avoid mix with produced shell code) unless if
+   # a debugging mode is set
+   if {![isVerbosityLevel trace]} {
+      unsetConf verbosity
+      set ::asked_verbosity silent
+   }
+
+   # modulefile evaluation is done against mod-to-sh target shell which means
+   # module-info will return mod-to-sh shell value
+   return [cmdModuleLoad load 1 0 0 {} {*}$args]
+
+   # after evaluation, renderSettings will produce shell code for mod-to-sh
+   # target shell. modtosh_real_shell state helps to know that shell code has
+   # to be output on report message channel
+}
+
+proc cmdModuleReset {} {
+   # use reset_target_state configuration option to know the environment state
+   # to restore
+   if {[getConf reset_target_state] eq {__purge__}} {
+      cmdModulePurge
+   } else {
+      cmdModuleRestore [getConf reset_target_state]
+   }
+}
+
+proc cmdModuleStash {} {
+   # check if there is something to stash
+   if {[getConf reset_target_state] eq {__purge__}} {
+      # load tags from loaded modules
+      cacheCurrentModules
+
+      # current environment differs from initial 'purge' state when at least
+      # a module is loaded and it is not super-sticky and not sticky or force
+      # mode is enabled to allow sticky tag unload
+      set diff_from_init 0
+      foreach mod [getLoadedModulePropertyList name] {
+         if {![isModuleTagged $mod super-sticky 1] && (![isModuleTagged $mod\
+            sticky 1] || [getState force])} {
+            set diff_from_init 1
+            break
+         }
+      }
+   } else {
+      # compare current environment against initial collection to check if
+      # something differ
+      set coll [getConf reset_target_state]
+      # get corresponding collection or init, raise error if it does not exist
+      lassign [findCollections $coll exact 0 1] collfile colldesc
+
+      # fetch collection content and differences compared current environment
+      lassign [getDiffBetweenCurEnvAndColl $collfile $colldesc]\
+         coll_path_list coll_mod_list coll_tag_arrser coll_nuasked_list\
+         mod_to_unload mod_to_load path_to_unuse path_to_use is_tags_diff
+      array set coll_tag_arr $coll_tag_arrser
+
+      set diff_from_init [expr {[llength $mod_to_unload] > 0 || [llength\
+         $mod_to_load] > 0 || [llength $path_to_unuse] > 0 || [llength\
+         $path_to_use] > 0 || $is_tags_diff}]
+   }
+
+   if {!$diff_from_init} {
+      reportWarning {No specific environment to save}
+      return
+   }
+
+   # record current environment
+   cmdModuleSave stash-[clock milliseconds]
+
+   # restore initial environment
+   cmdModuleReset
+}
+
+proc cmdModuleStashpop {{stash 0}} {
+   # determine stash collection name from argument
+   set coll [getCollectionFromStash $stash]
+
+   # restore stash collection environment state
+   cmdModuleRestore $coll
+
+   # delete stash collection file
+   cmdModuleSaverm $coll
+}
+
+proc cmdModuleStashrm {{stash 0}} {
+   # determine stash collection name from argument
+   set coll [getCollectionFromStash $stash]
+
+   # delete stash collection file
+   cmdModuleSaverm $coll
+}
+
+proc cmdModuleStashshow {{stash 0}} {
+   # determine stash collection name from argument
+   set coll [getCollectionFromStash $stash]
+
+   # display stash collection file
+   cmdModuleSaveshow $coll
+}
+
+proc cmdModuleStashclear {} {
+   # get all stash collections (only from current target)
+   set collfile_list [findCollections stash-* glob 0 0 1 1]
+
+   # delete all stash collections starting from most recent
+   foreach collfile [lsort -decreasing $collfile_list] {
+      # extract collection name (without path and target extension)
+      set coll [file rootname [file tail $collfile]]
+
+      # delete stash collection file
+      cmdModuleSaverm $coll
+   }
+}
+
+proc cmdModuleStashlist {show_oneperline show_mtime} {
+   cmdModuleSavelist $show_oneperline $show_mtime {} stash-*
+}
+
+proc cmdModuleCachebuild {args} {
+   # use enabled modulepaths when no arg is provided
+   if {[llength $args] > 0} {
+      set modpath_list $args
+   } else {
+      set modpath_list [getModulePathList exiterronundef]
+   }
+
+   # record cache with module header check options enabled
+   setConf mcookie_check always
+   setConf mcookie_version_check 1
+
+   # ignore cache when building cache
+   setConf ignore_cache 1
+
+   foreach modpath $modpath_list {
+      set cachefile [getModuleCacheFilename $modpath]
+      # set a record message unique id and record cachefile title
+      set msgrecid cachebuild-$cachefile
+      pushMsgRecordId $msgrecid
+      registerModuleDesignation $msgrecid $cachefile {} {}
+
+      if {[file isdirectory $modpath]} {
+         if {[file writable $modpath]} {
+            if {[catch {
+               # get cache content for modulepath
+               set cache [formatModuleCacheContent $modpath]
+               if {[string length $cache] == 0} {
+                  reportWarning {Nothing to record in cache file}
+               } else {
+                  # record cache content in file
+                  set fid [open $cachefile w]
+                  # use defined buffer size to limit num of write system call
+                  fconfigure $fid -buffersize [getConf cache_buffer_bytes]
+                  puts $fid $cache
+                  close $fid
+               }
+            } errMsg]} {
+               # report error occurring during cache content format or cache
+               # file write
+               reportError $errMsg
+            }
+         } else {
+            reportWarning {Cannot build cache file, directory is not writable}
+         }
+      } else {
+         reportError "'$modpath' is not a directory"
+      }
+
+      # report all messages for this cachefile creation
+      reportMsgRecord "Creating [getModuleDesignation $msgrecid {} 2]"
+      popMsgRecordId
+   }
+}
+
+proc cmdModuleCacheclear {} {
+   foreach modpath [getModulePathList exiterronundef] {
+      set cachefile [getModuleCacheFilename $modpath]
+      if {[file exists $cachefile]} {
+         # set a record message unique id and record cachefile title
+         set msgrecid cacheclear-$cachefile
+         pushMsgRecordId $msgrecid
+         registerModuleDesignation $msgrecid $cachefile {} {}
+
+         if {[file writable $modpath]} {
+            if {[catch {file delete $cachefile} errMsg]} {
+               reportError $errMsg
+            }
+         } else {
+            reportWarning {Cannot remove cache file, directory is not\
+               writable}
+         }
+
+         # report all messages for this cachefile deletion
+         reportMsgRecord "Deleting [getModuleDesignation $msgrecid {} 2]"
+         popMsgRecordId
+      }
+   }
+}
+
+# ;;; Local Variables: ***
+# ;;; mode:tcl ***
+# ;;; End: ***
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

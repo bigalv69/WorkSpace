@@ -1,0 +1,4497 @@
+.\" Man page generated from reStructuredText.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "MODULE" "1" "2024-02-20" "5.4.0" "Modules"
+.SH NAME
+module \- command interface to the Modules package
+.SH SYNOPSIS
+.sp
+\fBmodule\fP [\fIswitches\fP] [\fIsub\-command\fP [\fIsub\-command\-args\fP]]
+.SH DESCRIPTION
+.sp
+\fBmodule\fP is a user interface to the Modules package. The Modules
+package provides for the dynamic modification of the user\(aqs environment
+via \fImodulefiles\fP\&.
+.sp
+Each \fImodulefile\fP contains the information needed to configure the
+shell for an application. Once the Modules package is initialized, the
+environment can be modified on a per\-module basis using the \fBmodule\fP
+command which interprets \fImodulefiles\fP\&. Typically \fImodulefiles\fP instruct
+the \fBmodule\fP command to alter or set shell environment variables such
+as \fBPATH\fP, \fBMANPATH\fP, etc. \fIModulefiles\fP may be shared by many
+users on a system and users may have their own set to supplement or replace
+the shared \fImodulefiles\fP\&.
+.sp
+The \fImodulefiles\fP are added to and removed from the current environment
+by the user. The environment changes contained in a \fImodulefile\fP can be
+summarized through the \fBmodule\fP command as well. If no arguments are
+given, a summary of the \fBmodule\fP usage and \fIsub\-commands\fP are shown.
+.sp
+The action for the \fBmodule\fP command to take is described by the
+\fIsub\-command\fP and its associated arguments.
+.SS Package Initialization
+.sp
+The Modules package and the \fBmodule\fP command are initialized when a
+shell\-specific initialization script is sourced into the shell. The script
+executes the \fBautoinit\fP sub\-command of the \fBmodulecmd.tcl\fP
+program located in \fB@libexecdir@\fP for the corresponding shell. The output
+of this execution is evaluated by shell which creates the \fBmodule\fP
+command as either an alias or function and creates Modules environment
+variables.
+.sp
+During this initialization process, if the Modules environment is found
+undefined (when both \fI\%MODULEPATH\fP and \fI\%LOADEDMODULES\fP are
+found either unset or empty), the \fBmodulespath\fP and \fBinitrc\fP
+configuration files located in \fB@etcdir@\fP are evaluated if present and
+following this order. \fBmodulespath\fP file contains the list of
+modulepaths to enable during initialization. In this file, the modulepaths are
+separated by newline or colon characters. \fBinitrc\fP is a modulefile that
+defines during initialization the modulepaths to enable, the modules to load
+and the \fBmodule\fP configuration to apply.
+.sp
+During the initialization process, if the Modules environment is found defined
+a \fI\%module refresh\fP is automatically applied to restore in the
+current environment all non\-persistent components set by loaded modules.
+.sp
+The \fBmodule\fP alias or function executes the \fBmodulecmd.tcl\fP
+program and has the shell evaluate the command\(aqs output. The first argument to
+\fBmodulecmd.tcl\fP specifies the type of shell.
+.sp
+The initialization scripts are kept in \fB@initdir@/<shell>\fP where
+\fI<shell>\fP is the name of the sourcing shell. For example, a C Shell user
+sources the \fB@initdir@/csh\fP script. The sh, csh, tcsh, bash, ksh,
+zsh, fish and cmd shells are supported by \fBmodulecmd.tcl\fP\&. In addition,
+python, perl, ruby, tcl, cmake, r and lisp \(dqshells\(dq are supported which
+writes the environment changes to stdout as python, perl, ruby, tcl, lisp,
+r or cmake code.
+.sp
+Initialization may also be performed by directly calling the
+\fBautoinit\fP sub\-command of the \fBmodulecmd.tcl\fP program.
+.sp
+A \fBml\fP alias or function may also be defined at initialization time
+if enabled (see \fI\%MODULES_ML\fP section). \fBml\fP is a handy
+frontend leveraging all \fBmodule\fP command capabilities with less
+character typed. See \fI\%ml\fP for detailed information.
+.SS Examples of initialization
+.sp
+C Shell initialization (and derivatives):
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+source @initdir@/csh
+module load modulefile modulefile ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Bourne Shell (sh) (and derivatives):
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+\&. @initdir@/sh
+module load modulefile modulefile ...
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Perl:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+require \(dq@initdir@/perl.pm\(dq;
+&module(\(aqload\(aq, \(aqmodulefile\(aq, \(aqmodulefile\(aq, \(aq...\(aq);
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Python:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+import os
+exec(open(\(dq@initdir@/python.py\(dq).read(), globals())
+module(\(dqload\(dq, \(dqmodulefile\(dq, \(dqmodulefile\(dq, \(dq...\(dq)
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Bourne Shell (sh) (and derivatives) with \fBautoinit\fP sub\-command:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+eval \(dq$(@libexecdir@/modulecmd.tcl sh autoinit)\(dq
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Modulecmd startup
+.sp
+Upon invocation \fBmodulecmd.tcl\fP sources a site\-specific configuration
+script if it exists. Siteconfig script is a Tcl script located at
+\fB@etcdir@/siteconfig.tcl\fP\&. It enables to supersede any global variable or
+procedure definition of \fBmodulecmd.tcl\fP\&. See \fI\%Site\-specific configuration\fP for detailed information.
+.sp
+Afterward, \fBmodulecmd.tcl\fP sources rc files which contain global,
+user and \fImodulefile\fP specific setups. These files are interpreted as
+\fImodulefiles\fP\&. See \fI\%modulefile\fP for detailed information.
+.sp
+Upon invocation of \fBmodulecmd.tcl\fP module run\-command files are sourced
+in the following order:
+.INDENT 0.0
+.IP 1. 3
+Global RC file(s) as specified by \fI\%MODULERCFILE\fP variable or
+\fB@etcdir@/rc\fP\&. If a path element in \fI\%MODULERCFILE\fP points to a
+directory, the \fBmodulerc\fP file in this directory is used as a global
+RC file.
+.IP 2. 3
+User specific module RC file \fB$HOME/.modulerc\fP
+.IP 3. 3
+All \fB\&.modulerc\fP and \fB\&.version\fP files found during modulefile
+seeking.
+.UNINDENT
+.sp
+These module run\-command files must begins like \fImodulefiles\fP with the
+\fB#%Module\fP file signature, also called the Modules magic cookie. A version
+number may be placed after this string. The version number reflects the
+minimum version of \fBmodulecmd.tcl\fP required to interpret the run\-command
+file. If a version number doesn\(aqt exist, then \fBmodulecmd.tcl\fP will
+assume the run\-command file is compatible. Files without the magic cookie or
+with a version number greater than the current version of
+\fBmodulecmd.tcl\fP will not be interpreted and an error is reported. Such
+error does not abort the whole \fBmodule\fP evaluation. If the
+\fI\%mcookie_version_check\fP configuration is disabled the version number
+set is not checked.
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Run\-command files are intended to set parameters for modulefiles,
+not to configure the \fBmodule\fP command itself.
+.UNINDENT
+.UNINDENT
+.SS Command line switches
+.sp
+The \fBmodule\fP command accepts command line switches as its first
+parameter. These may be used to control output format of all information
+displayed and the \fBmodule\fP behavior in case of locating and
+interpreting \fImodulefiles\fP\&.
+.sp
+All switches may be entered either in short or long notation. The following
+switches are accepted:
+.INDENT 0.0
+.TP
+.B \-\-all, \-a
+Include hidden modules in search performed with \fI\%avail\fP,
+\fI\%aliases\fP, \fI\%list\fP, \fI\%lint\fP, \fI\%savelist\fP,
+\fI\%search\fP or \fI\%whatis\fP sub\-commands. Hard\-hidden modules are
+not affected by this option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-auto
+Enable automated module handling mode on sub\-commands that load or unload
+modulefiles. See also \fI\%MODULES_AUTO_HANDLING\fP section.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-color=<WHEN>
+Colorize the output. \fIWHEN\fP defaults to \fBalways\fP or can be \fBnever\fP or
+\fBauto\fP\&. See also \fI\%MODULES_COLOR\fP section.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-contains, \-C
+On \fI\%avail\fP, \fI\%list\fP and \fI\%savelist\fP sub\-commands,
+return modules or collections whose fully qualified name contains search
+query string.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-debug, \-D, \-DD
+Debug mode. Causes \fBmodule\fP to print debugging messages about its
+progress. Multiple \fI\%\-D\fP options increase the debug verbosity. The
+maximum is 2.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-default, \-d
+On \fI\%avail\fP sub\-command, display only the default version of each
+module name. Default version is the explicitly set default version or also
+the implicit default version if the configuration option
+\fI\%implicit_default\fP is enabled (see \fI\%Locating Modulefiles\fP
+section in the \fI\%modulefile\fP man page for further details on implicit
+default version).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-force, \-f
+On \fI\%load\fP, \fI\%unload\fP, \fI\%switch\fP, \fI\%load\-any\fP,
+\fI\%try\-load\fP, \fI\%mod\-to\-sh\fP and \fI\%source\fP sub\-commands
+by\-pass any unsatisfied modulefile constraint corresponding to the declared
+\fI\%prereq\fP and \fI\%conflict\fP\&. Which means for instance that a
+\fImodulefile\fP will be loaded even if it comes in conflict with another loaded
+\fImodulefile\fP or that a \fImodulefile\fP will be unloaded even if it is required
+as a prereq by another \fImodulefile\fP\&.
+.sp
+On \fI\%load\fP, \fBml\fP, \fI\%mod\-to\-sh\fP, \fI\%purge\fP,
+\fI\%reload\fP, \fI\%switch\fP, \fI\%try\-load\fP and \fI\%unload\fP
+sub\-commands applies \fIcontinue on error\fP behavior when an error occurs even
+if \fI\%abort_on_error\fP option is enabled.
+.sp
+On \fBml\fP, \fI\%purge\fP, \fI\%reload\fP, \fI\%reset\fP,
+\fI\%restore\fP, \fI\%stash\fP, \fI\%stashpop\fP, \fI\%switch\fP and
+\fI\%unload\fP sub\-commands, unloads modulefile anyway even if an
+evaluation error occurs.
+.sp
+On \fI\%clear\fP sub\-command, skip the confirmation dialog and proceed.
+.sp
+On \fI\%purge\fP sub\-command also unload \fI\%sticky modules\fP and modulefiles
+that are depended by non\-unloadable modules.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-help, \-h
+Give some helpful usage information, and terminates the command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-icase, \-i
+Match module specification arguments in a case insensitive manner.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ignore\-cache
+Ignore module cache.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ignore\-user\-rc
+Skip evaluation of user\-specific module rc file (\fB$HOME/.modulerc\fP).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-indepth
+On \fI\%avail\fP sub\-command, include in search results the matching
+modulefiles and directories and recursively the modulefiles and directories
+contained in these matching directories.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-json, \-j
+Display \fI\%avail\fP, \fI\%list\fP, \fI\%savelist\fP,
+\fI\%stashlist\fP, \fI\%whatis\fP and \fI\%search\fP output in JSON
+format.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-latest, \-L
+On \fI\%avail\fP sub\-command, display only the highest numerically sorted
+version of each module name (see \fI\%Locating Modulefiles\fP section in the
+\fI\%modulefile\fP man page).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-long, \-l
+Display \fI\%avail\fP, \fI\%list\fP, \fI\%savelist\fP and
+\fI\%stashlist\fP output in long format.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-no\-auto
+Disable automated module handling mode on sub\-commands that load or unload
+modulefiles. See also \fI\%MODULES_AUTO_HANDLING\fP section.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-no\-indepth
+On \fI\%avail\fP sub\-command, limit search results to the matching
+modulefiles and directories found at the depth level expressed by the search
+query. Thus modulefiles contained in directories part of the result are
+excluded.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-no\-pager
+Do not pipe message output into a pager.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-no\-redirect
+Do not send message output to stdout. Keep it on stderr.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-output=LIST, \-o LIST
+Define the content to report in addition to module names. This option is
+supported by \fI\%avail\fP and \fI\%list\fP sub\-commands on their regular
+or terse output modes. Accepted values are a \fILIST\fP of elements to report
+separated by colon character (\fB:\fP). The order of the elements in \fILIST\fP
+does not matter.
+.sp
+Accepted elements in \fILIST\fP for \fI\%avail\fP sub\-command are:
+\fImodulepath\fP, \fIalias\fP, \fIdirwsym\fP, \fIindesym\fP, \fIsym\fP, \fItag\fP, \fIkey\fP, \fIvariant\fP
+and \fIvariantifspec\fP\&.
+.sp
+Accepted elements in \fILIST\fP for \fI\%list\fP sub\-command are: \fIheader\fP,
+\fIidx\fP, \fIvariant\fP, \fIalias\fP, \fIindesym\fP, \fIsym\fP, \fItag\fP and \fIkey\fP\&.
+.sp
+The order of the elements in \fILIST\fP does not matter. Module names are the
+only content reported when \fILIST\fP is set to an empty value.
+.sp
+\fILIST\fP may be prefixed by \fB+\fP or \fB\-\fP character to indicate respectively
+to append it to or subtract it from current configuration option value.
+.sp
+See also \fI\%MODULES_AVAIL_OUTPUT\fP and \fI\%MODULES_LIST_OUTPUT\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-paginate
+Pipe all message output into \fBless\fP (or if set, to the command
+referred in \fI\%MODULES_PAGER\fP variable) if error output stream is a
+terminal. See also \fI\%MODULES_PAGER\fP section.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-redirect
+Send message output to stdout instead of stderr. Only supported on sh, bash,
+ksh, zsh and fish shells.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-silent, \-s
+Turn off error, warning and informational messages. \fBmodule\fP command
+output result is not affected by silent mode.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-starts\-with, \-S
+On \fI\%avail\fP, \fI\%list\fP and \fI\%savelist\fP sub\-commands,
+return modules or collections whose name starts with search query string.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-tag=LIST
+On \fI\%load\fP, \fI\%load\-any\fP, \fI\%switch\fP and
+\fI\%try\-load\fP sub\-commands, apply LIST of module tags to the loading
+\fImodulefile\fP\&. \fILIST\fP corresponds to the concatenation of multiple tags
+separated by colon character (\fB:\fP). \fILIST\fP should not contain tags
+inherited from \fImodulefile\fP state or from other modulefile commands. If
+module is already loaded, tags from \fILIST\fP are added to the list of tags
+already applied to this module.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-terse, \-t
+Display \fI\%avail\fP, \fI\%list\fP, \fI\%savelist\fP and
+\fI\%stashlist\fP output in short format.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-timer
+Prints at the end of the output an evaluation of the total execution time of
+the \fBmodule\fP command. When mixed with a single or multiple
+\fI\%\-\-debug\fP options, replaces regular debug messages by reports of the
+execution time of every internal procedure calls.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-trace, \-T
+Trace mode. Report details on module searches, resolutions, selections and
+evaluations in addition to printing verbose messages.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-verbose, \-v, \-vv
+Enable verbose messages during \fBmodule\fP command execution. Multiple
+\fI\%\-v\fP options increase the verbosity level. The maximum is 2.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-version, \-V
+Lists the current version of the \fBmodule\fP command. The command then
+terminates without further processing.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-width=COLS, \-w COLS
+Set the width of the output to \fICOLS\fP columns. See also
+\fI\%MODULES_TERM_WIDTH\fP section.
+.UNINDENT
+.SS Module Sub\-Commands
+.INDENT 0.0
+.TP
+.B add [options] modulefile...
+See \fI\%load\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B add\-any [options] modulefile...
+See \fI\%load\-any\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B aliases [\-a]
+List all available symbolic version\-names and aliases in the current
+\fI\%MODULEPATH\fP\&. All directories in the \fI\%MODULEPATH\fP are
+recursively searched in the same manner than for the \fI\%avail\fP
+sub\-command. Only the symbolic version\-names and aliases found in the search
+are displayed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B append\-path [options] variable value...
+Append \fIvalue\fP to environment \fIvariable\fP\&. The \fIvariable\fP is a colon, or
+\fIdelimiter\fP, separated list. See \fI\%append\-path\fP in the
+\fI\%modulefile\fP man page for \fIoptions\fP description and further
+explanation.
+.sp
+When \fI\%append\-path\fP is called as a module sub\-command, the reference
+counter variable, which denotes the number of times \fIvalue\fP has been added to
+environment \fIvariable\fP, is not updated unless if the \fB\-\-duplicates\fP option
+is set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B apropos [\-a] [\-j] string
+See \fI\%search\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B avail [\-d|\-L] [\-t|\-l|\-j] [\-a] [\-o LIST] [\-S|\-C] [\-\-indepth|\-\-no\-indepth] [pattern...]
+List all available \fImodulefiles\fP in the current \fI\%MODULEPATH\fP\&. All
+directories in the \fI\%MODULEPATH\fP are recursively searched for files
+containing the Modules magic cookie. If a \fIpattern\fP argument is given, then
+each directory in the \fI\%MODULEPATH\fP is searched for \fImodulefiles\fP
+whose pathname, symbolic version\-name or alias match \fIpattern\fP in a case
+insensitive manner by default. \fIpattern\fP may contain wildcard characters.
+Multiple versions of an application can be supported by creating a
+subdirectory for the application containing \fImodulefiles\fP for each version.
+.sp
+Symbolic version\-names and aliases found in the search are displayed in the
+result of this sub\-command. Symbolic version\-names are displayed next to
+the \fImodulefile\fP they are assigned to within parenthesis. Aliases are listed
+in the \fI\%MODULEPATH\fP section where they have been defined. To
+distinguish aliases from \fImodulefiles\fP a \fB@\fP symbol is added within
+parenthesis next to their name. Aliases defined through a global or user
+specific module RC file are listed under the \fBglobal/user modulerc\fP
+section.
+.sp
+When colored output is enabled and a specific graphical rendition is defined
+for module \fIdefault\fP version, the \fBdefault\fP symbol is omitted and instead
+the defined graphical rendition is applied to the relative modulefile. When
+colored output is enabled and a specific graphical rendition is defined for
+module alias, the \fB@\fP symbol is omitted. The defined graphical rendition
+applies to the module alias name. See \fI\%MODULES_COLOR\fP and
+\fI\%MODULES_COLORS\fP sections for details on colored output.
+.sp
+Module tags applying to the available \fImodulefiles\fP returned by the
+\fI\%avail\fP sub\-command are reported along the module name they are
+associated to (see \fI\%Module tags\fP section).
+.sp
+Module variants and their available values may be reported along the module
+name they belong to (see \fI\%Module variants\fP section) if defined in avail
+output configuration option (see \fI\%\-\-output\fP/\fI\%\-o\fP option). The
+\fI\%Extra match search\fP process is triggered to collect variant
+information.
+.sp
+A \fIKey\fP section is added at the end of the output in case some elements are
+reported in parentheses or chevrons along module name or if some graphical
+rendition is made over some output elements. This \fIKey\fP section gives hints
+on the meaning of such elements.
+.sp
+The parameter \fIpattern\fP may also refer to a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+If \fIpattern\fP contains variant specification or \fI\%Extra specifier\fP, the
+\fI\%Extra match search\fP process is triggered to collect command information
+used in modulefiles. Modules are included in results only if they match
+\fIpattern\fP variant specification and extra specifier. \fIpattern\fP may be a bare
+variant specification or extra specifier without mention of a module name.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B cachebuild [modulepath...]
+Build module cache file for designated modulepaths. If no argument is
+provided cache file is built for every modulepath currently enabled. Cache
+file creation is skipped for modulepaths where user cannot write in.
+.sp
+The name and content of every readable modulefiles and rc files are recorded
+into cache file. Also last modification time of modulefiles and invalid
+modulefile error messages are recorded. With all these information, the sole
+cache file is evaluated to know what is available within modulepath.
+.sp
+See \fI\%Module cache\fP section for more details on module cache mechanism.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B cacheclear
+Delete module cache file in every modulepath currently enabled. If user
+cannot write in a modulepath directory, cache file deletion is skipped for
+this modulepath.
+.sp
+See \fI\%Module cache\fP section for more details on module cache mechanism.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B clear [\-f]
+Force the Modules package to believe that no modules are currently loaded. A
+confirmation is requested if command\-line switch \fI\%\-f\fP (or
+\fI\%\-\-force\fP) is not passed. Typed confirmation should equal to \fByes\fP
+or \fBy\fP in order to proceed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B config [\-\-dump\-state|name [value]|\-\-reset name]
+Gets or sets \fBmodulecmd.tcl\fP options. Reports the currently set value
+of passed option \fIname\fP or all existing options if no \fIname\fP passed. If a
+\fIname\fP and a \fIvalue\fP are provided, the value of option \fIname\fP is set to
+\fIvalue\fP\&. If command\-line switch \fB\-\-reset\fP is passed in addition to a
+\fIname\fP, overridden value for option \fIname\fP is cleared.
+.sp
+When a reported option value differs from default value a mention is added
+to indicate whether the overridden value is coming from a command\-line switch
+(\fBcmd\-line\fP) or from an environment variable (\fBenv\-var\fP). When a reported
+option value is locked and cannot be altered a (\fBlocked\fP) mention is added.
+.sp
+If no value is currently set for an option \fIname\fP, the mention \fB<undef>\fP is
+reported.
+.sp
+For options whose value is a colon\-separated list, \fIvalue\fP may be prefixed by
+\fB+\fP or \fB\-\fP character. It indicates respectively to append it to or
+subtract it from current option value.
+.sp
+When command\-line switch \fB\-\-dump\-state\fP is passed, current
+\fBmodulecmd.tcl\fP state and Modules\-related environment variables are
+reported in addition to currently set \fBmodulecmd.tcl\fP options.
+.sp
+Existing option \fInames\fP are:
+.INDENT 7.0
+.TP
+.B abort_on_error
+List of module sub\-commands that abort evaluation sequence when an error is
+raised by an evaluated module. Evaluations already performed are withdrawn
+and remaining modules to evaluate are skipped.
+.sp
+This configuration option can be changed at installation time with
+\fI\%\-\-with\-abort\-on\-error\fP option. The
+\fI\%MODULES_ABORT_ON_ERROR\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_ABORT_ON_ERROR\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B advanced_version_spec
+Advanced module version specification to finely select modulefiles.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-advanced\-version\-spec\fP
+option. The \fI\%MODULES_ADVANCED_VERSION_SPEC\fP environment variable is
+defined by \fI\%config\fP sub\-command when changing this configuration
+option from its default value. See \fI\%MODULES_ADVANCED_VERSION_SPEC\fP
+description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B auto_handling
+Automated module handling mode.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-auto\-handling\fP option. The
+\fI\%MODULES_AUTO_HANDLING\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-auto\fP and \fI\%\-\-no\-auto\fP
+command line switches change the value of this configuration option. See
+\fI\%MODULES_AUTO_HANDLING\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B avail_indepth
+\fI\%avail\fP sub\-command in depth search mode.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-avail\-indepth\fP option. The
+\fI\%MODULES_AVAIL_INDEPTH\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-indepth\fP and \fI\%\-\-no\-indepth\fP
+command line switches change the value of this configuration option. See
+\fI\%MODULES_AVAIL_INDEPTH\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B avail_output
+Content to report in addition to module names on \fI\%avail\fP sub\-command
+regular output mode.
+.sp
+Default value is \fBmodulepath:alias:dirwsym:sym:tag:key\fP\&. It can be changed
+at installation time with \fI\%\-\-with\-avail\-output\fP option. The
+\fI\%MODULES_AVAIL_OUTPUT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-output\fP/\fI\%\-o\fP command line switches
+change the value of this configuration option. See
+\fI\%MODULES_AVAIL_OUTPUT\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B avail_terse_output
+Content to report in addition to module names on \fI\%avail\fP sub\-command
+terse output mode.
+.sp
+Default value is \fBmodulepath:alias:dirwsym:sym:tag\fP\&. It can be changed at
+installation time with \fI\%\-\-with\-avail\-terse\-output\fP option. The
+\fI\%MODULES_AVAIL_TERSE_OUTPUT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-output\fP/\fI\%\-o\fP command line switches
+change the value of this configuration option. See
+\fI\%MODULES_AVAIL_TERSE_OUTPUT\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B cache_buffer_bytes
+Size of the buffer used when reading or writing cache files.
+.sp
+Default value is \fB32768\fP\&. Values between 4096 and 1000000 are accepted.
+The \fI\%MODULES_CACHE_BUFFER_BYTES\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B cache_expiry_secs
+Number of seconds a cache file is considered valid after being generated.
+.sp
+Default value is \fB0\fP\&. Values between 0 and 31536000 are accepted.
+The \fI\%MODULES_CACHE_EXPIRY_SECS\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B collection_pin_version
+Register exact modulefile version in collection.
+.sp
+Default value is \fB0\fP\&. The \fI\%MODULES_COLLECTION_PIN_VERSION\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULES_COLLECTION_PIN_VERSION\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B collection_pin_tag
+Register full tag list applying to modulefiles in collection.
+.sp
+Default value is \fB0\fP\&. The \fI\%MODULES_COLLECTION_PIN_TAG\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULES_COLLECTION_PIN_TAG\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B collection_target
+Collection target which is valid for current system.
+.sp
+This configuration option is unset by default. The
+\fI\%MODULES_COLLECTION_TARGET\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_COLLECTION_TARGET\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B color
+Colored output mode.
+.sp
+Default value is \fBauto\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-color\fP option. The
+\fI\%MODULES_COLOR\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-color\fP command line switches changes the
+value of this configuration option. See \fI\%MODULES_COLOR\fP description
+for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B colors
+Chosen colors to highlight output items.
+.sp
+Default value is \fBhi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=100:L=90;47:H=2:F=41:nF=43:S=46:sS=44:kL=30;48;5;109\fP\&.
+It can be changed at installation time with
+\fI\%\-\-with\-dark\-background\-colors\fP or
+\fI\%\-\-with\-light\-background\-colors\fP options in conjunction with
+\fI\%\-\-with\-terminal\-background\fP\&. The \fI\%MODULES_COLORS\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULES_COLORS\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B contact
+Modulefile contact address.
+.sp
+Default value is \fBroot@localhost\fP\&. The \fI\%MODULECONTACT\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. See \fI\%MODULECONTACT\fP
+description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B extended_default
+Allow partial module version specification.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-extended\-default\fP option. The
+\fI\%MODULES_EXTENDED_DEFAULT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_EXTENDED_DEFAULT\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B editor
+Text editor command to open modulefile with through \fI\%edit\fP
+sub\-command.
+.sp
+Default value is \fBvi\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-editor\fP option. The \fI\%MODULES_EDITOR\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. See \fI\%MODULES_EDITOR\fP
+description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B extra_siteconfig
+Additional site\-specific configuration script location. See
+\fI\%Site\-specific configuration\fP section for details.
+.sp
+This configuration option is unset by default. The
+\fI\%MODULES_SITECONFIG\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_SITECONFIG\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B home
+Location of Modules package main directory.
+.sp
+Default value is \fB@prefix@\fP\&. It can be changed at installation time with
+\fI\%\-\-prefix\fP or \fI\%\-\-with\-moduleshome\fP options. The
+\fI\%MODULESHOME\fP environment variable is defined by \fI\%config\fP
+sub\-command when changing this configuration option from its default value.
+See \fI\%MODULESHOME\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B icase
+Enable case insensitive match.
+.sp
+Default value is \fBsearch\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-icase\fP option. The \fI\%MODULES_ICASE\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. The
+\fI\%\-\-icase\fP/\fI\%\-i\fP command line switches change the value of
+this configuration option. See \fI\%MODULES_ICASE\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B ignore_cache
+Ignore module cache.
+.sp
+Default is \fB0\fP\&. The \fI\%MODULES_IGNORE_CACHE\fP environment variable
+is defined by \fI\%config\fP sub\-command when changing this configuration
+option from its default value. The \fI\%\-\-ignore\-cache\fP command line
+switch changes the value of this configuration option.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B ignore_user_rc
+Skip evaluation of user\-specific module rc file (\fB$HOME/.modulerc\fP).
+.sp
+Default is \fB0\fP\&. The \fI\%MODULES_IGNORE_USER_RC\fP environment variable
+is defined by \fI\%config\fP sub\-command when changing this configuration
+option from its default value. The \fI\%\-\-ignore\-user\-rc\fP command line
+switch changes the value of this configuration option.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B ignored_dirs
+Directories ignored when looking for modulefiles.
+.sp
+Default value is \fBCVS RCS SCCS .svn .git .SYNC .sos\fP\&. The value of this
+option cannot be altered.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B implicit_default
+Set an implicit default version for modules.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-implicit\-default\fP option. The
+\fI\%MODULES_IMPLICIT_DEFAULT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_IMPLICIT_DEFAULT\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B implicit_requirement
+Implicitly define a requirement onto modules specified on \fI\%module\fP
+commands in modulefile.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-implicit\-requirement\fP
+option. The \fI\%MODULES_IMPLICIT_REQUIREMENT\fP environment variable is
+defined by \fI\%config\fP sub\-command when changing this configuration
+option from its default value. See \fI\%MODULES_IMPLICIT_REQUIREMENT\fP
+description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B list_output
+Content to report in addition to module names on \fI\%list\fP sub\-command
+regular output mode.
+.sp
+Default value is \fBheader:idx:variant:sym:tag:key\fP\&. It can be changed at
+installation time with \fI\%\-\-with\-list\-output\fP option. The
+\fI\%MODULES_LIST_OUTPUT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-output\fP/\fI\%\-o\fP command line switches
+change the value of this configuration option. See
+\fI\%MODULES_LIST_OUTPUT\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B list_terse_output
+Content to report in addition to module names on \fI\%list\fP sub\-command
+terse output mode.
+.sp
+Default value is \fBheader\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-list\-terse\-output\fP option. The
+\fI\%MODULES_LIST_TERSE_OUTPUT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-output\fP/\fI\%\-o\fP command line switches
+change the value of this configuration option. See
+\fI\%MODULES_LIST_TERSE_OUTPUT\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B locked_configs
+Configuration options that cannot be superseded. All options referred in
+\fI\%locked_configs\fP value are locked, thus their value cannot be
+altered.
+.sp
+This configuration option is set to an empty value by default. It can be
+changed at installation time with \fI\%\-\-with\-locked\-configs\fP option.
+The value of this option cannot be altered.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B mcookie_check
+Defines if the Modules magic cookie (i.e., \fB#%Module\fP file signature)
+should be checked to determine if a file is a modulefile.
+.sp
+Default value is \fBalways\fP\&. The \fI\%MODULES_MCOOKIE_CHECK\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. See
+\fI\%MODULES_MCOOKIE_CHECK\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B mcookie_version_check
+Defines if the version set in the Modules magic cookie used in modulefile
+should be checked against the version of \fBmodulecmd.tcl\fP to determine
+if the modulefile could be evaluated or not.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-mcookie\-version\-check\fP
+option. The \fI\%MODULES_MCOOKIE_VERSION_CHECK\fP environment variable is
+defined by \fI\%config\fP sub\-command when changing this configuration
+option from its default value. See \fI\%MODULES_MCOOKIE_VERSION_CHECK\fP
+description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B ml
+Define \fBml\fP command at initialization time.
+.sp
+Default value is \fB1\fP\&. It can be changed at installation time with
+\fI\%\-\-disable\-ml\fP option. The \fI\%MODULES_ML\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULES_ML\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B nearly_forbidden_days
+Set the number of days a module should be considered \fInearly forbidden\fP
+prior reaching its expiry date.
+.sp
+Default value is \fB14\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-nearly\-forbidden\-days\fP option. The
+\fI\%MODULES_NEARLY_FORBIDDEN_DAYS\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_NEARLY_FORBIDDEN_DAYS\fP description
+for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B pager
+Text viewer to paginate message output.
+.sp
+Default value is \fBless \-eFKRX\fP\&. It can be changed at installation time
+with \fI\%\-\-with\-pager\fP and \fI\%\-\-with\-pager\-opts\fP options. The
+\fI\%MODULES_PAGER\fP environment variable is defined by \fI\%config\fP
+sub\-command when changing this configuration option from its default value.
+See \fI\%MODULES_PAGER\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B protected_envvars
+Prevents any modification of listed environment variables (colon \fI:\fP
+separator).
+.sp
+This configuration option is unset by default. The
+\fI\%MODULES_PROTECTED_ENVVARS\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_PROTECTED_ENVVARS\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B quarantine_support
+Defines if code for quarantine mechanism support should be generated in
+\fBmodule\fP shell function definition.
+.sp
+Default value is \fB0\fP\&. It can be changed at installation time with
+\fI\%\-\-enable\-quarantine\-support\fP option. The
+\fI\%MODULES_QUARANTINE_SUPPORT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_QUARANTINE_SUPPORT\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B rcfile
+Location of global run\-command file(s).
+.sp
+This configuration option is unset by default. The \fI\%MODULERCFILE\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULERCFILE\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B redirect_output
+Control whether or not the output of module command should be redirected
+from stderr to stdout.
+.sp
+Default value is \fB1\fP\&. The \fI\%MODULES_REDIRECT_OUTPUT\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. The \fI\%\-\-redirect\fP and
+\fI\%\-\-no\-redirect\fP command line switches change the value of this
+configuration option. See \fI\%MODULES_REDIRECT_OUTPUT\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B reset_target_state
+Control behavior of \fI\%reset\fP sub\-command. Whether environment should
+be purged (\fB__purge__\fP), initial environment (\fB__init__\fP) or a named
+collection (any other value) should restored.
+.sp
+Default value is \fB__init__\fP\&. The \fI\%MODULES_RESET_TARGET_STATE\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULES_RESET_TARGET_STATE\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B run_quarantine
+Environment variables to indirectly pass to \fBmodulecmd.tcl\fP\&.
+.sp
+This configuration option is set to an empty value by default. It can be
+changed at installation time with \fI\%\-\-with\-quarantine\-vars\fP option
+that sets \fI\%MODULES_RUN_QUARANTINE\fP\&. This environment variable is
+also defined by \fI\%config\fP sub\-command when changing this
+configuration option. See \fI\%MODULES_RUN_QUARANTINE\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B search_match
+Module search match style.
+.sp
+Default value is \fBstarts_with\fP\&. It can be changed at installation time
+with \fI\%\-\-with\-search\-match\fP option. The
+\fI\%MODULES_SEARCH_MATCH\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. The \fI\%\-\-contains\fP and \fI\%\-\-starts\-with\fP
+command line switches change the value of this configuration option. See
+\fI\%MODULES_SEARCH_MATCH\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B set_shell_startup
+Ensure module command definition by setting shell startup file.
+.sp
+Default value is \fB0\fP\&. It can be changed at installation time with
+\fI\%\-\-enable\-set\-shell\-startup\fP option. The
+\fI\%MODULES_SET_SHELL_STARTUP\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_SET_SHELL_STARTUP\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B shells_with_ksh_fpath
+Ensure module command is defined in ksh when it is started as a sub\-shell
+from the listed shells.
+.sp
+This configuration option is set to an empty value by default. The
+\fI\%MODULES_SHELLS_WITH_KSH_FPATH\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_SHELLS_WITH_KSH_FPATH\fP description
+for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B silent_shell_debug
+Disablement of shell debugging property for the module command. Also defines
+if code to silence shell debugging property should be generated in
+\fBmodule\fP shell function definition.
+.sp
+Default value is \fB0\fP\&. It can be changed at installation time with
+\fI\%\-\-enable\-silent\-shell\-debug\-support\fP option. The
+\fI\%MODULES_SILENT_SHELL_DEBUG\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_SILENT_SHELL_DEBUG\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B siteconfig
+Primary site\-specific configuration script location. See
+\fI\%Site\-specific configuration\fP section for details.
+.sp
+Default value is \fB@etcdir@/siteconfig.tcl\fP\&. It can be changed at installation
+time with \fI\%\-\-prefix\fP or \fI\%\-\-etcdir\fP options. The value of
+this option cannot be altered.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B source_cache
+Cache content of files evaluated in modulefile through \fBsource(n)\fP
+Tcl command.
+.sp
+Default value is \fB0\fP\&. It can be changed at installation time with
+\fI\%\-\-enable\-source\-cache\fP option. The \fI\%MODULES_SOURCE_CACHE\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. See
+\fI\%MODULES_SOURCE_CACHE\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B sticky_purge
+Error behavior when unloading sticky or super\-sticky module during a module
+\fI\%purge\fP\&.
+.sp
+Raise an \fBerror\fP (default) or emit a \fBwarning\fP or be \fBsilent\fP\&. It can
+be changed at installation time with \fI\%\-\-with\-sticky\-purge\fP option.
+The \fI\%MODULES_STICKY_PURGE\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_STICKY_PURGE\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B tag_abbrev
+Abbreviations to use to report module tags.
+.sp
+Default value is \fBauto\-loaded=aL:loaded=L:hidden=H:hidden\-loaded=H:forbidden=F:nearly\-forbidden=nF:sticky=S:super\-sticky=sS:keep\-loaded=kL\fP\&.
+It can be changed at installation time with \fI\%\-\-with\-tag\-abbrev\fP
+option. The \fI\%MODULES_TAG_ABBREV\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_TAG_ABBREV\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B tag_color_name
+Tags whose name should be colored instead of module name.
+.sp
+This configuration option is set to an empty value by default. It can be
+changed at installation time with \fI\%\-\-with\-tag\-color\-name\fP option.
+The \fI\%MODULES_TAG_COLOR_NAME\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_TAG_COLOR_NAME\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B tcl_ext_lib
+Modules Tcl extension library location.
+.sp
+Default value is \fB@libdir@/libtclenvmodules.so\fP\&. It can be changed at
+installation time with \fI\%\-\-prefix\fP or \fI\%\-\-libdir\fP options.
+The value of this option cannot be altered.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B tcl_linter
+Command to check syntax of modulefiles with through \fI\%lint\fP
+sub\-command.
+.sp
+Default value is \fBnagelfar.tcl\fP\&. It can be changed at installation time
+with \fI\%\-\-with\-tcl\-linter\fP and \fI\%\-\-with\-tcl\-linter\-opts\fP
+options. The \fI\%MODULES_TCL_LINTER\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_TCL_LINTER\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B term_background
+Terminal background color kind.
+.sp
+Default value is \fBdark\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-terminal\-background\fP option. The
+\fI\%MODULES_TERM_BACKGROUND\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_TERM_BACKGROUND\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B term_width
+Set the width of the output.
+.sp
+Default value is \fB0\fP\&. The \fI\%MODULES_TERM_WIDTH\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. The
+\fI\%\-\-width\fP/\fI\%\-w\fP command line switches change the value of
+this configuration option. See \fI\%MODULES_TERM_WIDTH\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B unique_name_loaded
+Only one module loaded per module name.
+.sp
+Default value is \fB0\fP\&. It can be changed at installation time with
+\fI\%\-\-enable\-unique\-name\-loaded\fP option. The
+\fI\%MODULES_UNIQUE_NAME_LOADED\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_UNIQUE_NAME_LOADED\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B unload_match_order
+Unload firstly loaded or lastly loaded module matching request.
+.sp
+Default value is \fBreturnlast\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-unload\-match\-order\fP option. The
+\fI\%MODULES_UNLOAD_MATCH_ORDER\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_UNLOAD_MATCH_ORDER\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B variant_shortcut
+Shortcut characters that could be used to specify or report module variants.
+.sp
+This configuration option is set to an empty value by default. It can be
+changed at installation time with \fI\%\-\-with\-variant\-shortcut\fP option.
+The \fI\%MODULES_VARIANT_SHORTCUT\fP environment variable is defined by
+\fI\%config\fP sub\-command when changing this configuration option from
+its default value. See \fI\%MODULES_VARIANT_SHORTCUT\fP description for
+details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B verbosity
+Module command verbosity level.
+.sp
+Default value is \fBnormal\fP\&. It can be changed at installation time with
+\fI\%\-\-with\-verbosity\fP option. The \fI\%MODULES_VERBOSITY\fP
+environment variable is defined by \fI\%config\fP sub\-command when
+changing this configuration option from its default value. The
+\fI\%\-\-debug\fP/\fI\%\-D\fP, \fI\%\-\-silent\fP/\fI\%\-s\fP,
+\fI\%\-\-trace\fP/\fI\%\-T\fP and \fI\%\-\-verbose\fP/\fI\%\-v\fP
+command line switches change the value of this configuration option. See
+\fI\%MODULES_VERBOSITY\fP description for details.
+.UNINDENT
+.INDENT 7.0
+.TP
+.B wa_277
+Workaround for Tcsh history issue.
+.sp
+Default value is \fB0\fP\&. It can be changed at installation time with
+\fI\%\-\-enable\-wa\-277\fP option. The \fI\%MODULES_WA_277\fP environment
+variable is defined by \fI\%config\fP sub\-command when changing this
+configuration option from its default value. See \fI\%MODULES_WA_277\fP
+description for details.
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B display modulefile...
+Display information about one or more \fImodulefiles\fP\&. The display sub\-command
+will list the full path of the \fImodulefile\fP and the environment changes
+the \fImodulefile\fP will make if loaded. (Note: It will not display any
+environment changes found within conditional statements.)
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When several \fImodulefiles\fP are passed, they are evaluated sequentially in the
+specified order. If one modulefile evaluation raises an error, display
+sequence continues.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B edit modulefile
+Open \fImodulefile\fP for edition with text editor command designated by the
+\fI\%editor\fP configuration option.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B help [modulefile...]
+Print the usage of each sub\-command. If an argument is given, print the
+Module\-specific help information for the \fImodulefile\fP\&.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When several \fImodulefiles\fP are passed, they are evaluated sequentially in the
+specified order. If one modulefile evaluation raises an error, help sequence
+continues.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B info\-loaded modulefile
+Returns the names of currently loaded modules matching passed \fImodulefile\fP\&.
+Returns an empty string if passed \fImodulefile\fP does not match any loaded
+modules. See \fI\%module\-info loaded\fP in the
+\fI\%modulefile\fP man page for further explanation.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B initadd modulefile...
+Add \fImodulefile\fP to the shell\(aqs initialization file in the user\(aqs home
+directory. The startup files checked (in order) are:
+.sp
+C Shell
+.INDENT 7.0
+.INDENT 3.5
+\fB\&.modules\fP, \fB\&.cshrc\fP, \fB\&.csh_variables\fP and \fB\&.login\fP
+.UNINDENT
+.UNINDENT
+.sp
+TENEX C Shell
+.INDENT 7.0
+.INDENT 3.5
+\fB\&.modules\fP, \fB\&.tcshrc\fP, \fB\&.cshrc\fP, \fB\&.csh_variables\fP
+and \fB\&.login\fP
+.UNINDENT
+.UNINDENT
+.sp
+Bourne and Korn Shells
+.INDENT 7.0
+.INDENT 3.5
+\fB\&.modules\fP, \fB\&.profile\fP
+.UNINDENT
+.UNINDENT
+.sp
+GNU Bourne Again Shell
+.INDENT 7.0
+.INDENT 3.5
+\fB\&.modules\fP, \fB\&.bash_profile\fP, \fB\&.bash_login\fP,
+\fB\&.profile\fP and \fB\&.bashrc\fP
+.UNINDENT
+.UNINDENT
+.sp
+Z Shell
+.INDENT 7.0
+.INDENT 3.5
+\fB\&.modules\fP, \fB\&.zshrc\fP, \fB\&.zshenv\fP and \fB\&.zlogin\fP
+.UNINDENT
+.UNINDENT
+.sp
+Friendly Interactive Shell
+.INDENT 7.0
+.INDENT 3.5
+\fB\&.modules\fP, \fB\&.config/fish/config.fish\fP
+.UNINDENT
+.UNINDENT
+.sp
+If a \fBmodule load\fP line is found in any of these files, the \fImodulefiles\fP
+are appended to any existing list of \fImodulefiles\fP\&. The \fBmodule load\fP
+line must be located in at least one of the files listed above for any of
+the \fI\%init\fP sub\-commands to work properly. If the
+\fBmodule load\fP line is found in multiple shell initialization files, all of
+the lines are changed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B initclear
+Clear all of the \fImodulefiles\fP from the shell\(aqs initialization files.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B initlist
+List all of the \fImodulefiles\fP loaded from the shell\(aqs initialization file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B initprepend modulefile...
+Does the same as \fI\%initadd\fP but prepends the given modules to the
+beginning of the list.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B initrm modulefile...
+Remove \fImodulefile\fP from the shell\(aqs initialization files.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B initswitch modulefile1 modulefile2
+Switch \fImodulefile1\fP with \fImodulefile2\fP in the shell\(aqs initialization files.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B is\-avail modulefile...
+Returns a true value if any of the listed \fImodulefiles\fP exists in enabled
+\fI\%MODULEPATH\fP\&. Returns a false value otherwise. See \fI\%is\-avail\fP
+in the \fI\%modulefile\fP man page for further explanation.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B is\-loaded [modulefile...]
+Returns a true value if any of the listed \fImodulefiles\fP has been loaded or if
+any \fImodulefile\fP is loaded in case no argument is provided. Returns a false
+value otherwise. See \fI\%is\-loaded\fP in the \fI\%modulefile\fP man page
+for further explanation.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B is\-saved [collection...]
+Returns a true value if any of the listed \fIcollections\fP exists or if any
+\fIcollection\fP exists in case no argument is provided. Returns a false value
+otherwise. See \fI\%is\-saved\fP in the \fI\%modulefile\fP man page for
+further explanation.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B is\-used [directory...]
+Returns a true value if any of the listed \fIdirectories\fP has been enabled in
+\fI\%MODULEPATH\fP or if any \fIdirectory\fP is enabled in case no argument is
+provided. Returns a false value otherwise. See \fI\%is\-used\fP in the
+\fI\%modulefile\fP man page for further explanation.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B keyword [\-a] [\-j] string
+See \fI\%search\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B lint [\-a] [modulefile...]
+Analyze syntax of one or more \fImodulefiles\fP with the linter command
+designated by the \fI\%tcl_linter\fP configuration option.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+If no \fImodulefile\fP is specified, all the \fImodulefiles\fP and modulerc
+available in enabled modulepaths are analyzed as well as global and user rc
+files. Hidden modulefiles are also analyzed when \fI\%\-\-all\fP/\fI\%\-a\fP
+option is set.
+.sp
+When \fBnagelfar.tcl\fP is the selected linter command, a static Tcl
+syntax analysis is performed. In addition, syntax of modulefile commands are
+checked in these files based on their kind (global/user rc, modulerc or
+modulefile).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B list [\-t|\-l|\-j] [\-a] [\-o LIST] [\-S|\-C] [pattern...]
+List loaded modules. If a \fIpattern\fP is given, then the loaded modules are
+filtered to only list those whose name matches this \fIpattern\fP\&. It may contain
+wildcard characters. \fIpattern\fP is matched in a case insensitive manner by
+default. If multiple \fIpatterns\fP are given, loaded module has to match at
+least one of them to be listed.
+.sp
+Module tags applying to the loaded modules are reported along the module name
+they are associated to (see \fI\%Module tags\fP section).
+.sp
+Module variants selected on the loaded modules are reported along the module
+name they belong to (see \fI\%Module variants\fP section).
+.sp
+A \fIKey\fP section is added at the end of the output in case some elements are
+reported in parentheses or chevrons along module name or if some graphical
+rendition is made over some output elements. This \fIKey\fP section gives hints
+on the meaning of such elements.
+.sp
+The parameter \fIpattern\fP may also refer to a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+If \fIpattern\fP contains variant specification, loaded modules are included in
+results only if they match it. \fIpattern\fP may be a bare variant specification
+without mention of a module name.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B load [options] modulefile...
+Load \fImodulefile\fP into the shell environment.
+.sp
+\fI\%load\fP command accepts the following options:
+.INDENT 7.0
+.IP \(bu 2
+\fB\-\-auto|\-\-no\-auto\fP
+.IP \(bu 2
+\fB\-f|\-\-force\fP
+.IP \(bu 2
+\fB\-\-tag=taglist\fP
+.UNINDENT
+.sp
+Once loaded, the \fBloaded\fP module tag is associated to the loaded module. If
+module has been automatically loaded by another module, the \fBauto\-loaded\fP
+tag is associated instead (see \fI\%Module tags\fP section).
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When several \fImodulefiles\fP are passed, they are loaded sequentially in the
+specified order. If one modulefile evaluation raises an error, load sequence
+continues: loaded modules prior the evaluation error are kept loaded and
+sequence is resumed with the load of remaining modulefile in list.
+Conversely, load sequence is aborted and already loaded modulefiles are
+withdrawn if \fI\%load\fP sub\-command is defined in
+\fI\%abort_on_error\fP configuration option and \fI\%\-\-force\fP option
+is not set.
+.sp
+The \fI\%\-\-tag\fP option accepts a list of module tags to apply to
+\fImodulefile\fP once loaded. If module is already loaded, tags from \fItaglist\fP
+are added to the list of tags already applied to this module.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B load\-any [options] modulefile...
+Load into the shell environment one of the \fImodulefile\fP specified. Try to
+load each \fImodulefile\fP specified in list from the left to the right until
+one got loaded or is found already loaded. Do not complain if \fImodulefile\fP
+cannot be found. But if its evaluation fails, an error is reported and next
+modulefile in list is evaluated.
+.sp
+\fI\%load\-any\fP command accepts the following options:
+.INDENT 7.0
+.IP \(bu 2
+\fB\-\-auto|\-\-no\-auto\fP
+.IP \(bu 2
+\fB\-f|\-\-force\fP
+.IP \(bu 2
+\fB\-\-tag=taglist\fP
+.UNINDENT
+.sp
+Once loaded, the \fBloaded\fP module tag is associated to the loaded module. If
+module has been automatically loaded by another module, the \fBauto\-loaded\fP
+tag is associated instead (see \fI\%Module tags\fP section).
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+The \fI\%\-\-tag\fP option accepts a list of module tags to apply to
+\fImodulefile\fP once loaded. If module is already loaded, tags from \fItaglist\fP
+are added to the list of tags already applied to this module.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B mod\-to\-sh [options] shell modulefile...
+Evaluate \fImodulefile\fP and report resulting environment changes as code for
+\fIshell\fP\&.
+.sp
+\fI\%mod\-to\-sh\fP command accepts the following options:
+.INDENT 7.0
+.IP \(bu 2
+\fB\-\-auto|\-\-no\-auto\fP
+.IP \(bu 2
+\fB\-f|\-\-force\fP
+.UNINDENT
+.sp
+An attempt to load \fImodulefile\fP is made to get its environment changes. This
+evaluation does not change the current shell environment. Like for
+\fI\%load\fP sub\-command, no evaluation occurs if \fImodulefile\fP is found
+loaded in current environment.
+.sp
+Changes made on environment variable intended for Modules private use (e.g.,
+\fI\%LOADEDMODULES\fP, \fI\%_LMFILES_\fP, \fB__MODULES_*\fP) are ignored.
+.sp
+\fIShell\fP could be any shell name supported by \fBmodulecmd.tcl\fP\&.
+.sp
+Produced \fIshell\fP code is returned on the message output channel by
+\fBmodulecmd.tcl\fP\&. Thus it is not rendered in current environment by the
+\fBmodule\fP shell function.
+.sp
+\fI\%mod\-to\-sh\fP automatically set \fI\%verbosity\fP to the \fBsilent\fP
+mode, to avoid messages to mix with the produced shell code. Verbosity is not
+changed if set to the \fBtrace\fP mode or any higher debugging level.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When several \fImodulefiles\fP are passed, they are evaluated sequentially in the
+specified order. If one modulefile evaluation raises an error, mod\-to\-sh
+sequence continues: environment change from modules evaluated prior the
+error are preserved and sequence is resumed with the evaluation of remaining
+modulefile in list. Conversely, mod\-to\-sh sequence is aborted and changes
+from already evaluated modules are withdrawn if \fI\%mod\-to\-sh\fP
+sub\-command is defined in \fI\%abort_on_error\fP configuration option and
+\fI\%\-\-force\fP option is not set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B path modulefile
+Print path to \fImodulefile\fP\&.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B paths pattern
+Print path of available \fImodulefiles\fP matching \fIpattern\fP\&.
+.sp
+The parameter \fIpattern\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+If \fIpattern\fP contains variant specification or \fI\%Extra specifier\fP, the
+\fI\%Extra match search\fP process is triggered to collect command information
+used in modulefiles. Modules are included in results only if they match
+\fIpattern\fP variant specification and extra specifier. \fIpattern\fP may be a bare
+variant specification or extra specifier without mention of a module name.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B prepend\-path [options] variable value...
+Prepend \fIvalue\fP to environment \fIvariable\fP\&. The \fIvariable\fP is a colon, or
+\fIdelimiter\fP, separated list. See \fI\%prepend\-path\fP in the
+\fI\%modulefile\fP man page for \fIoptions\fP description and further
+explanation.
+.sp
+When \fI\%prepend\-path\fP is called as a module sub\-command, the reference
+counter variable, which denotes the number of times \fIvalue\fP has been added to
+environment \fIvariable\fP, is not updated unless if the \fB\-\-duplicates\fP option
+is set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B purge [\-f]
+Unload all loaded \fImodulefiles\fP\&.
+.sp
+When the \fI\%\-\-force\fP option is set, also unload \fI\%sticky modules\fP,
+modulefiles that are depended by non\-unloadable modules and modulefiles
+raising an evaluation error.
+.sp
+If one modulefile unload evaluation raises an error, purge sequence
+continues: unloaded modules prior the evaluation error are kept unloaded and
+sequence is resumed with the unload of remaining modulefiles. Conversely,
+purge sequence is aborted and already unloaded modulefiles are restored if
+\fI\%purge\fP sub\-command is defined in \fI\%abort_on_error\fP
+configuration option and \fI\%\-\-force\fP option is not set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B refresh
+Force a refresh of all non\-persistent components of currently loaded modules.
+This should be used on derived shells where shell completions, shell aliases
+or shell functions need to be reinitialized but the environment variables
+have already been set by the currently loaded modules.
+.sp
+Loaded modules are evaluated in \fBrefresh\fP mode following their load order.
+In this evaluation mode only the \fI\%complete\fP, \fI\%set\-alias\fP,
+\fI\%set\-function\fP and \fI\%puts\fP modulefile commands will produce
+environment changes. Other modulefile commands that produce environment
+changes (like \fI\%setenv\fP or \fI\%append\-path\fP) are ignored during a
+\fBrefresh\fP evaluation as their changes should already be applied.
+.sp
+Only the loaded modules defining non\-persistent environment changes are
+evaluated in \fBrefresh\fP mode. Such loaded modules are listed in the
+\fI\%__MODULES_LMREFRESH\fP environment variable.
+.sp
+If one modulefile evaluation raises an error, refresh sequence continues:
+environment changes from refreshed modules prior the evaluation error are
+preserved and sequence is resumed with the refresh of remaining modulefiles.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B reload [\-f]
+Unload then load all loaded \fImodulefiles\fP\&.
+.sp
+No unload then load is performed and an error is returned if the loaded
+\fImodulefiles\fP have unsatisfied constraint corresponding to the
+\fI\%prereq\fP and \fI\%conflict\fP they declare.
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.sp
+If one modulefile load or unload evaluation raises an error, reload sequence
+aborts: environment changes coming from already evaluated modulefiles are
+withdrawn and remaining modulefile evaluations are skipped. Conversely, if
+\fI\%reload\fP is removed from \fI\%abort_on_error\fP configuration
+option list or if \fI\%\-\-force\fP option is set, reload sequence continues:
+already achieved module evaluations are kept and reload sequence is resumed
+with the remaining modulefiles.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B remove\-path [options] variable value...
+Remove \fIvalue\fP from the colon, or \fIdelimiter\fP, separated list in environment
+\fIvariable\fP\&. See \fI\%remove\-path\fP in the \fI\%modulefile\fP man page for
+\fIoptions\fP description and further explanation.
+.sp
+When \fI\%remove\-path\fP is called as a module sub\-command, the reference
+counter variable, which denotes the number of times \fIvalue\fP has been added to
+environment \fIvariable\fP, is ignored and \fIvalue\fP is removed whatever the
+reference counter value set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B reset [\-f]
+Restore initial environment, which corresponds to the loaded state after
+\fI\%Modules initialization\fP\&.
+.sp
+\fI\%reset\fP sub\-command restores the environment definition found in
+\fI\%__MODULES_LMINIT\fP environment variable.
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.sp
+\fI\%reset\fP behavior can be changed with \fI\%reset_target_state\fP\&.
+This configuration option is set by default to \fB__init__\fP, which
+corresponds to the above behavior description. When set to \fB__purge__\fP,
+\fI\%reset\fP performs a \fI\%purge\fP of the environment. When set to
+any other value, \fI\%reset\fP performs a \fI\%restore\fP of
+corresponding name collection.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B restore [\-f] [collection]
+Restore the environment state as defined in \fIcollection\fP\&. If \fIcollection\fP
+name is not specified, then it is assumed to be the \fIdefault\fP collection if
+it exists, \fB__init__\fP special collection otherwise. If \fIcollection\fP is a
+fully qualified path, it is restored from this location rather than from a
+file under the user\(aqs collection directory. If
+\fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix equivalent to the value
+of this variable is appended to the \fIcollection\fP file name to restore.
+.sp
+If \fIcollection\fP name is \fB__init__\fP, initial environment state defined in
+\fI\%__MODULES_LMINIT\fP environment variable is restored.
+.sp
+When restoring a \fIcollection\fP, the currently set \fI\%MODULEPATH\fP
+directory list and the currently loaded \fImodulefiles\fP are unused and
+unloaded then used and loaded to exactly match the \fI\%MODULEPATH\fP and
+loaded \fImodulefiles\fP lists saved in this \fIcollection\fP file. The order
+of the paths and modulefiles set in \fIcollection\fP is preserved when
+restoring. It means that currently loaded modules are unloaded to get
+the same \fI\%LOADEDMODULES\fP root than collection and currently used
+module paths are unused to get the same \fI\%MODULEPATH\fP root. Then
+missing module paths are used and missing modulefiles are loaded.
+.sp
+If a module, without a default version explicitly defined, is recorded in a
+\fIcollection\fP by its bare name: loading this module when restoring the
+collection will fail if the configuration option \fI\%implicit_default\fP
+is disabled.
+.sp
+If one modulefile load or unload evaluation raises an error, restore sequence
+continues: environment changes from modules unloaded or loaded prior the
+evaluation error are preserved and sequence is resumed with the unload or
+load of remaining modulefiles.
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B rm [\-\-auto|\-\-no\-auto] [\-f] modulefile...
+See \fI\%unload\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B save [collection]
+Record the currently set \fI\%MODULEPATH\fP directory list and the
+currently loaded \fImodulefiles\fP in a \fIcollection\fP file under the user\(aqs
+collection directory \fB$HOME/.module\fP\&. If \fIcollection\fP name is not
+specified, then it is assumed to be the \fBdefault\fP collection. If
+\fIcollection\fP is a fully qualified path, it is saved at this location rather
+than under the user\(aqs collection directory.
+.sp
+If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix equivalent to the
+value of this variable will be appended to the \fIcollection\fP file name.
+.sp
+By default, if a loaded modulefile corresponds to the explicitly defined
+default module version, the bare module name is recorded. If the
+configuration option \fI\%implicit_default\fP is enabled, the bare module
+name is also recorded for the implicit default module version. If
+\fI\%MODULES_COLLECTION_PIN_VERSION\fP is set to \fB1\fP, module version is
+always recorded even if it is the default version.
+.sp
+By default, only the module tags specifically set with the \fI\%\-\-tag\fP
+option or resulting from a specific module state (like \fBauto\-loaded\fP and
+\fBkeep\-loaded\fP tags) are recorded in collection. If
+\fI\%MODULES_COLLECTION_PIN_TAG\fP is set to \fB1\fP, all tags are recorded
+in collection except \fBnearly\-forbidden\fP tag.
+.sp
+No \fIcollection\fP is recorded and an error is returned if the loaded
+\fImodulefiles\fP have unsatisfied constraint corresponding to the
+\fI\%prereq\fP and \fI\%conflict\fP they declare.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B savelist [\-t|\-l|\-j] [\-a] [\-S|\-C] [pattern...]
+List collections that are currently saved under the user\(aqs collection
+directory. If \fI\%MODULES_COLLECTION_TARGET\fP is set, only collections
+matching the target suffix will be displayed unless if the
+\fI\%\-\-all\fP/\fI\%\-a\fP option is set.
+.sp
+If a \fIpattern\fP is given, then the collections are filtered to only list
+those whose name matches this \fIpattern\fP\&. It may contain wildcard characters.
+\fIpattern\fP is matched in a case insensitive manner by default. If multiple
+\fIpatterns\fP are given, collection has to match at least one of them to be
+listed.
+.sp
+Stash collections are not listed unless if the \fI\%\-\-all\fP/\fI\%\-a\fP
+option is set. Stash collections can be listed with \fI\%stashlist\fP
+sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B saverm [collection]
+Delete the \fIcollection\fP file under the user\(aqs collection directory. If
+\fIcollection\fP name is not specified, then it is assumed to be the \fIdefault\fP
+collection. If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix
+equivalent to the value of this variable will be appended to the \fIcollection\fP
+file name.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B saveshow [collection]
+Display the content of \fIcollection\fP\&. If \fIcollection\fP name is not specified,
+then it is assumed to be the \fIdefault\fP collection if it exists, \fB__init__\fP
+special collection otherwise. If \fIcollection\fP is a fully qualified path, this
+location is displayed rather than a collection file under the user\(aqs
+collection directory. If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix
+equivalent to the value of this variable will be appended to the \fIcollection\fP
+file name.
+.sp
+If \fIcollection\fP name is \fB__init__\fP, initial environment content defined in
+\fI\%__MODULES_LMINIT\fP environment variable is displayed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B search [\-a] [\-j] string
+Seeks through the \fI\%module\-whatis\fP information of all \fImodulefiles\fP
+for the specified \fIstring\fP\&. All \fImodule\-whatis\fP information matching the
+\fIstring\fP in a case insensitive manner will be displayed. \fIstring\fP may contain
+wildcard characters.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B sh\-to\-mod shell script [arg...]
+Evaluate with \fIshell\fP the designated \fIscript\fP with defined \fIarguments\fP to
+find out the environment changes it does. Environment prior and after
+\fIscript\fP evaluation are compared to determine these changes. They are
+translated into \fImodulefile\fP commands to output the modulefile content
+equivalent to the evaluation of shell script.
+.sp
+Changes on environment variables, shell aliases, shell functions, shell
+completions and current working directory are tracked.
+.sp
+Changes made on environment variable intended for Modules private use (e.g.,
+\fI\%LOADEDMODULES\fP, \fI\%_LMFILES_\fP, \fB__MODULES_*\fP) are ignored.
+.sp
+\fIShell\fP could be specified as a command name or a fully qualified pathname.
+The following shells are supported: sh, dash, csh, tcsh, bash, ksh, ksh93,
+zsh and fish.
+.sp
+\fIShell\fP could also be set to \fBbash\-eval\fP\&. In this mode, bash shell \fIscript\fP
+is not sourced but the output resulting from its execution is evaluated to
+determine the environment changes it does.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B show modulefile...
+See \fI\%display\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B source [options] modulefile...
+Execute \fImodulefile\fP into the shell environment. Once executed \fImodulefile\fP
+is not marked loaded in shell environment which differ from \fI\%load\fP
+sub\-command.
+.sp
+\fI\%source\fP command accepts the following options:
+.INDENT 7.0
+.IP \(bu 2
+\fB\-\-auto|\-\-no\-auto\fP
+.IP \(bu 2
+\fB\-f|\-\-force\fP
+.UNINDENT
+.sp
+If \fImodulefile\fP corresponds to a fully qualified path, this file is executed.
+Otherwise \fImodulefile\fP is searched among the available modulefiles.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When several \fImodulefiles\fP are passed, they are evaluated sequentially in the
+specified order. If one modulefile evaluation raises an error, source
+sequence continues: environment changes from modules sourced prior the
+evaluation error are preserved and sequence is resumed with the source of
+remaining modulefile in list.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B stash [\-f]
+\fI\%Save\fP current environment in a stash collection then
+\fI\%reset\fP to initial environment.
+.sp
+A collection is created only if current environment state differs from
+initial environment. Stash collection is named
+\fIstash\-<unix_millis_timestamp>\fP where \fI<unix_millis_timestamp>\fP is the number
+of milliseconds between Unix Epoch and when this command is run.
+.sp
+If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix equivalent to the
+value of this variable will be appended to the stash collection file name.
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B stashclear
+Remove all stash collection files of current \fI\%collection_target\fP\&. If
+no collection target is currently set, remove stash collection files without
+a target suffix.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B stashlist [\-t|\-l|\-j]
+List all stash collection files of current \fI\%collection_target\fP\&. If
+no collection target is currently set, list stash collection files without a
+target suffix.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B stashpop [\-f] [stash]
+\fI\%Restore\fP \fIstash\fP collection then delete corresponding
+collection file.
+.sp
+\fIstash\fP is either a full stash collection name (i.e.,
+\fIstash\-<unix_millis_timestamp>\fP) or a stash index. Most recent stash
+collection has index \fI0\fP, \fI1\fP is the one before it. When no \fIstash\fP is given
+the latest stash collection is assumed (that is stash index \fI0\fP).
+.sp
+If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix equivalent to the
+value of this variable will be appended to the stash collection file name to
+restore.
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B stashrm [stash]
+\fI\%Remove\fP \fIstash\fP collection file.
+.sp
+\fIstash\fP is either a full stash collection name (i.e.,
+\fIstash\-<unix_millis_timestamp>\fP) or a stash index. Most recent stash
+collection has index \fI0\fP, \fI1\fP is the one before it. When no \fIstash\fP is given
+the latest stash collection is assumed (that is stash index \fI0\fP).
+.sp
+If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix equivalent to the
+value of this variable will be appended to the stash collection file name to
+delete.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B stashshow [stash]
+\fI\%Display\fP the content of \fIstash\fP collection file.
+.sp
+\fIstash\fP is either a full stash collection name (i.e.,
+\fIstash\-<unix_millis_timestamp>\fP) or a stash index. Most recent stash
+collection has index \fI0\fP, \fI1\fP is the one before it. When no \fIstash\fP is given
+the latest stash collection is assumed (that is stash index \fI0\fP).
+.sp
+If \fI\%MODULES_COLLECTION_TARGET\fP is set, a suffix equivalent to the
+value of this variable will be appended to the stash collection file name to
+display.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B state [name]
+Gets \fBmodulecmd.tcl\fP states. Reports the currently set value
+of passed state \fIname\fP or all existing states if no \fIname\fP passed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B swap [options] [modulefile1] modulefile2
+See \fI\%switch\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B switch [options] [modulefile1] modulefile2
+Switch loaded \fImodulefile1\fP with \fImodulefile2\fP\&. If \fImodulefile1\fP is not
+specified, then it is assumed to be the currently loaded module with the
+same root name as \fImodulefile2\fP\&.
+.sp
+\fI\%switch\fP command accepts the following options:
+.INDENT 7.0
+.IP \(bu 2
+\fB\-\-auto|\-\-no\-auto\fP
+.IP \(bu 2
+\fB\-f|\-\-force\fP
+.IP \(bu 2
+\fB\-\-tag=taglist\fP
+.UNINDENT
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+The \fI\%\-\-tag\fP option accepts a list of module tags to apply to
+\fImodulefile\fP once loaded. If module is already loaded, tags from \fItaglist\fP
+are added to the list of tags already applied to this module.
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.sp
+If unload evaluation of \fImodulefile1\fP raises an error, switch sequence
+aborts: no environment change from \fImodulefile1\fP unload is applied and load
+of \fImodulefile2\fP is skipped. Conversely, if \fBswitch_unload\fP value is
+removed from \fI\%abort_on_error\fP configuration option list (and
+\fBswitch\fP value is not set there) or if \fI\%\-\-force\fP option is set,
+switch sequence continues. If \fImodulefile1\fP is tagged \fBsuper\-sticky\fP,
+switch sequence aborts in any case.
+.sp
+If load evaluation of \fImodulefile2\fP raises an error, switch sequence
+continues: environment changes from \fImodulefile1\fP unload are applied but not
+those from failed \fImodulefile2\fP load. Conversely, whole switch sequence is
+aborted and unloaded \fImodulefile1\fP is restored if \fI\%switch\fP
+sub\-command is defined in \fI\%abort_on_error\fP configuration option and
+\fI\%\-\-force\fP option is not set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B test modulefile...
+Execute and display results of the Module\-specific tests for the
+\fImodulefile\fP\&.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When several \fImodulefiles\fP are passed, they are evaluated sequentially in the
+specified order. If one modulefile evaluation raises an error, test sequence
+continues.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B try\-add [options] modulefile...
+See \fI\%try\-load\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B try\-load [options] modulefile...
+Like \fI\%load\fP sub\-command, load \fImodulefile\fP into the shell
+environment, but do not complain if \fImodulefile\fP cannot be found. If
+\fImodulefile\fP is found but its evaluation fails, error is still reported.
+.sp
+\fI\%try\-load\fP command accepts the following options:
+.INDENT 7.0
+.IP \(bu 2
+\fB\-\-auto|\-\-no\-auto\fP
+.IP \(bu 2
+\fB\-f|\-\-force\fP
+.IP \(bu 2
+\fB\-\-tag=taglist\fP
+.UNINDENT
+.sp
+Once loaded, the \fBloaded\fP module tag is associated to the loaded module. If
+module has been automatically loaded by another module, the \fBauto\-loaded\fP
+tag is associated instead (see \fI\%Module tags\fP section).
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+The \fI\%\-\-tag\fP option accepts a list of module tags to apply to
+\fImodulefile\fP once loaded. If module is already loaded, tags from \fItaglist\fP
+are added to the list of tags already applied to this module.
+.sp
+When several \fImodulefiles\fP are passed, they are try\-loaded sequentially in
+the specified order. If one modulefile evaluation raises an error, try\-load
+sequence continues: loaded modules prior the evaluation error are kept loaded
+and sequence is resumed with the load of remaining modulefile in list.
+Conversely, try\-load sequence is aborted and already loaded modulefiles are
+withdrawn if \fI\%try\-load\fP sub\-command is defined in
+\fI\%abort_on_error\fP configuration option and \fI\%\-\-force\fP option
+is not set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B unload [\-\-auto|\-\-no\-auto] [\-f] modulefile...
+Remove \fImodulefile\fP from the shell environment.
+.sp
+The parameter \fImodulefile\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+When the \fI\%\-\-force\fP option is set, unload modulefiles anyway even if
+an evaluation error occurs.
+.sp
+When several \fImodulefiles\fP are passed, they are unloaded sequentially in the
+specified order. If one modulefile evaluation raises an error, unload
+sequence continues: unloaded modules prior the evaluation error are kept
+unloaded and sequence is resumed with the unload of remaining modulefile in
+list. Conversely, unload sequence is aborted and already unloaded modulefiles
+are restored if \fI\%unload\fP sub\-command is defined in
+\fI\%abort_on_error\fP configuration option and \fI\%\-\-force\fP option
+is not set.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B unuse directory...
+Remove one or more \fIdirectories\fP from the \fI\%MODULEPATH\fP environment
+variable.
+.sp
+If \fI\%module unuse\fP is called during a modulefile evaluation,
+the reference counter environment variable
+\fI\%__MODULES_SHARE_MODULEPATH\fP, which denotes
+the number of times \fIdirectory\fP has been enabled, is checked and \fIdirectory\fP
+is removed only if its relative counter is equal to 1 or not defined.
+Otherwise \fIdirectory\fP is kept and reference counter is decreased by 1. When
+\fI\%module unuse\fP is called from the command\-line or within an
+initialization modulefile script \fIdirectory\fP is removed whatever the
+reference counter value set.
+.sp
+If \fIdirectory\fP corresponds to the concatenation of multiple paths separated
+by colon character, each path is treated separately.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B use [\-a|\-\-append] directory...
+Prepend one or more \fIdirectories\fP to the \fI\%MODULEPATH\fP environment
+variable. The \fB\-\-append\fP flag will append the \fIdirectory\fP to
+\fI\%MODULEPATH\fP\&.
+.sp
+When \fIdirectory\fP is already defined in \fI\%MODULEPATH\fP, it is not added
+again or moved at the end or at the beginning of the environment variable.
+.sp
+If \fI\%module use\fP is called during a modulefile evaluation, the
+reference counter environment variable
+\fI\%__MODULES_SHARE_MODULEPATH\fP is also set to
+increase the number of times \fIdirectory\fP has been added to
+\fI\%MODULEPATH\fP\&. Reference counter is not updated when
+\fI\%module use\fP is called from the command\-line or within an
+initialization modulefile script.
+.sp
+A \fIdirectory\fP that does not exist yet can be specified as argument and then
+be added to \fI\%MODULEPATH\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B whatis [\-a] [\-j] [pattern...]
+Display the information set up by the \fI\%module\-whatis\fP commands inside
+\fImodulefiles\fP matching \fIpattern\fP\&. \fIpattern\fP may contain wildcard characters.
+If no \fIpattern\fP is specified, all \fI\%module\-whatis\fP lines will be shown.
+.sp
+The parameter \fIpattern\fP may also be a symbolic modulefile name or a
+modulefile alias. It may also leverage a specific syntax to finely select
+module version (see \fI\%Advanced module version specifiers\fP section below).
+.sp
+If \fIpattern\fP contains variant specification or \fI\%Extra specifier\fP, the
+\fI\%Extra match search\fP process is triggered to collect command information
+used in modulefiles. Modules are included in results only if they match
+\fIpattern\fP variant specification and extra specifier. \fIpattern\fP may be a bare
+variant specification or extra specifier without mention of a module name.
+.UNINDENT
+.SS Modulefiles
+.sp
+\fImodulefiles\fP are written in the Tool Command Language (Tcl) and are
+interpreted by \fBmodulecmd.tcl\fP\&. \fImodulefiles\fP can use conditional
+statements. Thus the effect a \fImodulefile\fP will have on the environment
+may change depending upon the current state of the environment.
+.sp
+Environment variables are unset when unloading a \fImodulefile\fP\&. Thus, it is
+possible to \fI\%load\fP a \fImodulefile\fP and then \fI\%unload\fP it without
+having the environment variables return to their prior state.
+.SS Advanced module version specifiers
+.sp
+When the advanced module version specifiers mechanism is enabled (see
+\fI\%MODULES_ADVANCED_VERSION_SPEC\fP), the specification of modulefile
+passed on Modules sub\-commands changes. After the module name a version
+constraint and variants may be added.
+.SS Version specifiers
+.sp
+After the module name a version constraint prefixed by the \fB@\fP character may
+be added. It could be directly appended to the module name or separated from
+it with a space character.
+.sp
+Constraints can be expressed to refine the selection of module version to:
+.INDENT 0.0
+.IP \(bu 2
+a single version with the \fB@version\fP syntax, for instance \fBfoo@1.2.3\fP
+syntax will select module \fBfoo/1.2.3\fP
+.IP \(bu 2
+a list of versions with the \fB@version1,version2,...\fP syntax, for instance
+\fBfoo@1.2.3,1.10\fP will match modules \fBfoo/1.2.3\fP and \fBfoo/1.10\fP
+.IP \(bu 2
+a range of versions with the \fB@version1:\fP, \fB@:version2\fP and
+\fB@version1:version2\fP syntaxes, for instance \fBfoo@1.2:\fP will select all
+versions of module \fBfoo\fP greater than or equal to \fB1.2\fP, \fBfoo@:1.3\fP
+will select all versions less than or equal to \fB1.3\fP and \fBfoo@1.2:1.3\fP
+matches all versions between \fB1.2\fP and \fB1.3\fP including \fB1.2\fP and
+\fB1.3\fP versions
+.UNINDENT
+.sp
+Advanced specification of single version or list of versions may benefit from
+the activation of the extended default mechanism (see
+\fI\%MODULES_EXTENDED_DEFAULT\fP) to use an abbreviated notation like \fB@1\fP
+to refer to more precise version numbers like \fB1.2.3\fP\&. Range of versions on
+its side natively handles abbreviated versions.
+.sp
+In order to be specified in a range of versions or compared to a range of
+versions, the version major element should corresponds to a number. For
+instance \fB10a\fP, \fB1.2.3\fP, \fB1.foo\fP are versions valid for range
+comparison whereas \fBdefault\fP or \fBfoo.2\fP versions are invalid for range
+comparison.
+.sp
+Range of versions can be specified in version list, for instance
+\fBfoo@:1.2,1.4:1.6,1.8:\fP\&. Such specification helps to exclude specific
+versions, like versions \fB1.3\fP and \fB1.7\fP in previous example.
+.sp
+If the implicit default mechanism is also enabled (see
+\fI\%MODULES_IMPLICIT_DEFAULT\fP), a \fBdefault\fP and \fBlatest\fP symbolic
+versions are automatically defined for each module name (also at each
+directory level for deep \fImodulefiles\fP). These automatic version symbols are
+defined unless a symbolic version, alias, or regular module version already
+exists for these \fBdefault\fP or \fBlatest\fP version names. Using the
+\fBmod@latest\fP (or \fBmod/latest\fP) syntax ensures highest available version
+will be selected.
+.sp
+The symbolic version \fBloaded\fP may be used over loaded module name to
+designate the loaded version of the module with associated selected variants.
+This version symbol should be specified using the \fB@\fP prefix notation (e.g.,
+\fBfoo@loaded\fP). An error is returned if no version of designated module is
+currently loaded.
+.SS Variants
+.sp
+After the module name, variants can be specified. \fI\%Module variants\fP are
+alternative evaluation of the same \fImodulefile\fP\&. A variant is specified by
+associating a value to its name. This specification is then transmitted to the
+evaluating \fImodulefile\fP which instantiates the variant in the
+\fI\%ModuleVariant\fP array variable when reaching the \fI\%variant\fP
+modulefile command declaring this variant.
+.sp
+Variant can be specified with the \fBname=value\fP syntax where \fIname\fP is the
+declared variant name and \fIvalue\fP, the value this variant is set to when
+evaluating the \fImodulefile\fP\&.
+.sp
+Boolean variants can be specified with the \fB+name\fP syntax to set this
+variant on and with the \fB\-name\fP or \fB~name\fP syntaxes to set this variant
+off. The \fB\-name\fP syntax is not supported on \fI\%ml\fP command as the
+minus sign already means to unload designated module. The \fB~name\fP and
+\fB+name\fP syntaxes could also be defined appended to another specification
+word (e.g., the module name, version or another variant specification),
+whereas \fB\-name\fP syntax must be the start of a new specification word.
+.sp
+Boolean variants may also be specified with the \fBname=value\fP syntax. \fIvalue\fP
+should be set to \fB1\fP, \fBtrue\fP, \fBt\fP, \fByes\fP, \fBy\fP or \fBon\fP to enable
+the variant or it should be set to \fB0\fP, \fBfalse\fP, \fBf\fP, \fBno\fP, \fBn\fP or
+\fBoff\fP to disable the variant.
+.sp
+Shortcuts may be used to abbreviate variant specification. The
+\fI\%variant_shortcut\fP configuration option associates shortcut character
+to variant name. With a shortcut defined, variant could be specified with the
+\fB<shortcut>value\fP syntax. For instance if character \fB%\fP is set as a
+shortcut for variant \fBfoo\fP, the \fB%value\fP syntax is equivalent to the
+\fBfoo=value\fP syntax.
+.sp
+Specific characters used in variant specification syntax cannot be used as
+part of the name of a module. These specific characters are \fB+\fP, \fB~\fP,
+\fB=\fP and all characters set as variant shortcut. Exception is made for \fB+\fP
+character which could be set one or several consecutive times at the end of
+module name (e.g., \fIname+\fP or \fIname++\fP).
+.SS Extra specifier
+.sp
+After the module name, extra specifiers can be defined in module search
+context. Extra specifiers are an extra query to list available modulefiles
+based on their content definition. They rely on the \fI\%Extra match search\fP
+mechanism that collects content of available modulefiles.
+.sp
+Extra specifier can be set with the \fBelement:name[,name,...]\fP syntax where
+\fIelement\fP is a Tcl modulefile command and \fIname\fP an item defined by this
+command. Depending on the kind of Tcl modulefile command, \fIname\fP can refer to
+an environment variable, a shell alias, a module specification, etc.
+.sp
+Supported extra specifier \fIelements\fP are:
+.INDENT 0.0
+.IP \(bu 2
+\fBvariant\fP, \fBcomplete\fP, \fBuncomplete\fP, \fBset\-alias\fP, \fBunset\-alias\fP,
+\fBset\-function\fP, \fBunset\-function\fP, \fBchdir\fP, \fBfamily\fP, \fBtag\fP
+.IP \(bu 2
+\fBsetenv\fP, \fBunsetenv\fP, \fBappend\-path\fP, \fBprepend\-path\fP, \fBremove\-path\fP
+and \fBpushenv\fP: these elements related to environment variable handling may
+also be aliased \fBenvvar\fP
+.IP \(bu 2
+\fBprereq\fP, \fBprereq\-any\fP, \fBprereq\-all\fP, \fBdepends\-on\fP, \fBalways\-load\fP,
+\fBload\fP, \fBload\-any\fP, \fBtry\-load\fP, \fBswitch\fP and \fBswitch\-on\fP: these
+elements related to module requirement definition accept a module
+specification as value \fIname\fP and may be aliased \fBrequire\fP
+.IP \(bu 2
+\fBconflict\fP, \fBunload\fP, \fBswitch\fP and \fBswitch\-off\fP: these elements
+related to module incompatibility definition accept a module specification
+as value \fIname\fP and may be aliased \fBincompat\fP
+.UNINDENT
+.sp
+Each of the above supported \fIelements\fP corresponds to a Tcl modulefile
+command. \fBload\fP, \fBload\-any\fP, \fBtry\-load\fP, \fBswitch\fP and \fBunload\fP match
+corresponding module sub\-commands. \fBprereq\-any\fP is an alias on \fBprereq\fP
+and vice versa as both Tcl modulefile commands are the same. Following the
+same trend \fBprereq\-all\fP is an alias on \fBdepends\-on\fP and vice versa.
+Regarding \fBswitch\-off\fP and \fBswitch\-on\fP elements they correspond
+respectively to the module to unload (if specified) and the module to load on
+a \fBmodule switch\fP command. \fBswitch\fP is an alias that matches both
+\fBswitch\-off\fP and \fBswitch\-on\fP elements. \fBrequire\fP and \fBincompat\fP
+\fIelements\fP do not match module commands where \fB\-\-not\-req\fP option is set.
+.sp
+When several \fInames\fP are set on one \fIelement\fP criterion (e.g.,
+\fBenv:PATH,LD_LIBRARY_PATH\fP), they act as an \fIOR\fP operation. Which means
+modules listed in result are those matching any of the \fIelement\fP \fInames\fP
+defined.
+.sp
+When several extra specifiers are set on a module search query (e.g.,
+\fBenv:PATH env:LD_LIBRARY_PATH\fP), they act as an \fIAND\fP operation. Which means
+modules listed in result are those matching all extra specifiers defined.
+.sp
+Module specification used as \fIname\fP value for some extra specifier \fIelements\fP
+may leverage \fI\%Advanced module version specifiers\fP syntax. However if a
+module version range or list is implied, it is currently resolved to existing
+modules. Thus it may not match modulefile definitions targeting modules that
+do not exist. In addition, module aliases and symbolic versions are not
+resolved to their target either if set in extra specifier query or in
+modulefile definition.
+.sp
+Extra specifier can only be set in a module search context (\fI\%avail\fP,
+\fI\%whatis\fP and \fI\%paths\fP sub\-commands). An error is raised if used
+on a module specification query in another context. An error is also raised
+if an unknown extra specifier \fIelement\fP is defined in search query.
+.SS Module tags
+.sp
+Module tags are piece of information that can be associated to individual
+modulefiles. Tags could be purely informational or may lead to specific
+behaviors.
+.sp
+Module tags may be inherited from the module state set by a modulefile command
+or consequence of a module action. The inherited tags are:
+.INDENT 0.0
+.IP \(bu 2
+\fBauto\-loaded\fP: module has been automatically loaded by another module
+.IP \(bu 2
+\fBforbidden\fP: module has been set \fIforbidden\fP through the use of the
+\fI\%module\-forbid\fP command and thus this module cannot be loaded.
+.IP \(bu 2
+\fBhidden\fP: module has been set \fIhidden\fP through the use of the
+\fI\%module\-hide\fP command and thus it is not reported by default among
+the result of an \fI\%avail\fP sub\-command.
+.IP \(bu 2
+\fBhidden\-loaded\fP: module has been set \fIhidden once loaded\fP through the use
+of the \fI\%module\-hide \-\-hidden\-loaded\fP command thus it is
+not reported bu default among the result of a \fI\%list\fP sub\-command.
+.IP \(bu 2
+\fBloaded\fP: module is currently loaded
+.IP \(bu 2
+\fBnearly\-forbidden\fP: module will soon be \fIforbidden\fP, which has been set
+through the use of the \fI\%module\-forbid\fP command. Thus this module
+will soon not be able to load anymore.
+.UNINDENT
+.sp
+Tags may also be associated to modules by using the \fI\%module\-tag\fP
+modulefile command. Among tags that could be set this way, some have a special
+meaning:
+.INDENT 0.0
+.IP \(bu 2
+\fBkeep\-loaded\fP: auto\-loaded module cannot be automatically unloaded. This
+tag is also set through the use of the \fI\%always\-load\fP command.
+.IP \(bu 2
+\fBsticky\fP: module once loaded cannot be unloaded unless forced or reloaded
+(see \fI\%Sticky modules\fP section)
+.IP \(bu 2
+\fBsuper\-sticky\fP: module once loaded cannot be unloaded unless reloaded,
+module cannot be unloaded even if forced (see \fI\%Sticky modules\fP section)
+.UNINDENT
+.sp
+The \fI\%\-\-tag\fP option helps to apply additional tags to modules. It is
+available on \fI\%load\fP, \fI\%load\-any\fP, \fI\%switch\fP and
+\fI\%try\-load\fP sub\-commands and on \fI\%always\-load\fP,
+\fI\%depends\-on\fP, \fI\%module\fP, \fI\%prereq\fP, \fI\%prereq\-all\fP and
+\fI\%prereq\-any\fP modulefile commands. In case the designated module is
+already loaded, the additional tags are added to the list of tags already
+applied to this module.
+.sp
+Module tags are reported along the module they are associated to on
+\fI\%avail\fP and \fI\%list\fP sub\-command results and also when module\(aqs
+loading, unloading, refreshing or tagging evaluation is mentioned. Tags could
+be reported either:
+.INDENT 0.0
+.IP \(bu 2
+along the module name, all tags set within angle brackets, each tag
+separated from the others with a colon character (e.g.,
+\fBfoo/1.2 <tag1:tag2>\fP).
+.IP \(bu 2
+graphically rendered over the module name for each tag associated to a
+Select Graphic Rendition (SGR) code in the color palette (see
+\fI\%MODULES_COLORS\fP)
+.UNINDENT
+.sp
+When an abbreviated string is associated to a tag name (see
+\fI\%MODULES_TAG_ABBREV\fP), this abbreviation is used to report tag along
+the module name or the tag is graphically rendered over the module name if a
+SGR code is associated with tag abbreviation in the color palette. With an
+abbreviation set, the SGR code associated to the tag full name is ignored thus
+an SGR code should be associated to the abbreviation to get a graphical
+rendering of tag. If the abbreviation associated to a tag corresponds to the
+empty string, tag is not reported.
+.sp
+Graphical rendering is made over the tag name or abbreviation instead of over
+the module name for each tag name or abbreviation set in the
+\fI\%MODULES_TAG_COLOR_NAME\fP environment variable.
+.sp
+When several tags have to be rendered graphically over the same module name,
+each tag is rendered over a sub\-part of the module name. In case more tags
+need to be rendered than the total number of characters in the module name,
+the remaining tags are graphically rendered over the tag name instead of over
+the module name.
+.sp
+When the JSON output mode is enabled (with \fI\%\-\-json\fP), tags are
+reported by their name under the \fBtags\fP attribute. Tag abbreviation and
+color rendering do not apply on JSON output.
+.sp
+Module tags cannot be used in search query to designate a modulefile.
+.SS Sticky modules
+.sp
+Modules are said \fIsticky\fP when they cannot be unloaded (they stick to the
+loaded environment). Two kind of stickiness can be distinguished:
+.INDENT 0.0
+.IP \(bu 2
+\fBsticky\fP module: cannot be unloaded unless if the unload is forced or if
+the module is reloaded after being unloaded or if restoring a collection.
+.IP \(bu 2
+\fBsuper\-sticky\fP module: cannot be unloaded unless if the module is reloaded
+after being unloaded; super\-sticky modules cannot be unloaded even if the
+unload is forced.
+.UNINDENT
+.sp
+Modules are designated sticky by associating them the \fBsticky\fP or the
+\fBsuper\-sticky\fP \fI\%module tag\fP with the \fI\%module\-tag\fP
+modulefile command.
+.sp
+When stickiness is defined over the generic module name (and not over a
+specific module version, a version list or a version range), sticky or
+super\-sticky module can be swapped by another version of module. For instance
+if the \fBsticky\fP tag is defined over \fIfoo\fP module, loaded module \fIfoo/1.2\fP
+can be swapped by \fIfoo/2.0\fP\&. Such stickiness definition means one version of
+module should stay loaded whatever version it is.
+.sp
+When restoring a \fI\%collection\fP or resetting to the initial
+environment, sticky modules are unloaded to ensure \fI\%restore\fP or
+\fI\%reset\fP sub\-commands fully set the environment in target collection or
+initial state. Super\-sticky modules still cannot be unloaded with
+\fI\%restore\fP and \fI\%reset\fP sub\-commands.
+.SS Module variants
+.sp
+Module variants are alternative evaluation of the same \fImodulefile\fP\&. A variant
+is specified by associating a value to its name when designating module.
+Variant specification relies on the \fI\%Advanced module version specifiers\fP
+mechanism.
+.sp
+Once specified, variant\(aqs value is transmitted to the evaluating \fImodulefile\fP
+which instantiates the variant in the \fI\%ModuleVariant\fP array variable
+when reaching the \fI\%variant\fP modulefile command declaring this variant.
+For instance the \fBmodule load foo/1.2 bar=value1\fP command leads to the
+evaluation of \fIfoo/1.2\fP modulefile with \fIbar=value1\fP variant specification.
+When reaching the \fBvariant bar value1 value2 value3\fP command in modulefile
+during its evaluation, the \fBModuleVariant(bar)\fP array element is set to
+the \fBvalue1\fP string.
+.sp
+Once variants are instantiated, modulefile\(aqs code could check the variant
+values to adapt the evaluation and define for instance different module
+requirements or produce different environment variable setup.
+.sp
+Variants are interpreted in contexts where \fImodulefiles\fP are evaluated.
+Variants specified on module designation are ignored by the
+\fI\%is\-avail\fP or \fI\%path\fP sub\-commands. On search sub\-commands
+(\fI\%avail\fP, \fI\%whatis\fP and \fI\%paths\fP), variants are
+interpreted and trigger the \fI\%Extra match search\fP process to filter
+results.
+.sp
+When modulefile is evaluated a value should be specified for each variant this
+modulefile declares. When reaching the \fI\%variant\fP modulefile command
+declaring a variant, an error is raised if no value is specified for this
+variant and if no default value is declared. Specified variant value should
+match a value from the declared accepted value list if such list is defined
+otherwise an error is raised. Additionally if a variant is specified but does
+not correspond to a variant declared in modulefile, an error is raised.
+.sp
+When searching for modules with variants specified in search query, the
+\fI\%Extra match search\fP process triggers a specific \fIscan\fP modulefile
+evaluation. Variants defined in modulefile are collected during this
+evaluation then compared to the variants specified in search query. If there
+is a match, module is included in search results otherwise it is withdrawn.
+.sp
+When searching for available modules, if one variant is specified multiple
+times, matching modules are those providing all specified variant values. For
+instance \fBbar=value1 bar=value2\fP will return modules defining a \fBbar\fP
+variant with \fBvalue1\fP and \fBvalue2\fP as available values. On a module
+selection context, only the last specified value is retained. Which means on
+previous example that \fBbar\fP variant is set to \fBvalue2\fP\&.
+.sp
+When searching for available modules, multiple values may be set on one
+variant criterion, which matches modules that provides any of these variant
+values. For instance \fBbar=value1,value2\fP will return modules defining a
+\fBbar\fP variant with either \fBvalue1\fP or \fBvalue2\fP as available value.
+.sp
+Module variants are reported along the module they are associated to on
+\fI\%list\fP sub\-command results. They are also reported on \fI\%avail\fP
+sub\-command if specified in search query or added to the element to report in
+sub\-command output (see \fI\%\-\-output\fP/\fI\%\-o\fP option).
+.sp
+Variants are reported within curly braces next to module name, each variant
+definition separated from the others with a colon character (e.g.,
+\fBfoo/1.2{variant1=value:+variant2}\fP). Boolean variants are reported with the
+\fB+name\fP or \fB\-name\fP syntaxes on \fI\%list\fP sub\-command or with the
+\fBname=on,off\fP syntax on \fI\%avail\fP sub\-command. When a shortcut
+character is defined for a variant (see \fI\%MODULES_VARIANT_SHORTCUT\fP) it
+is reported with the \fB<shortcut>value\fP syntax. For instance if \fB%\fP
+character is defined as a shortcut for \fIvariant1\fP:
+\fBfoo/1.2{%value:+variant2}\fP\&.
+.sp
+When the JSON output mode is enabled (with \fI\%\-\-json\fP), variants are
+reported under the \fBvariants\fP JSON object as name/value pairs. Values of
+Boolean variant are set as JSON Boolean. Other values are set as JSON strings.
+Variant shortcut and color rendering do not apply on JSON output.
+.SS Extra match search
+.sp
+Extra match search is a mechanism that evaluates available modulefiles during
+a module search to find those matching an extra query or to report additional
+information. After selecting modulefiles that match the module name and
+version specified in search query, these remaining modulefiles are evaluated
+to collect their content.
+.sp
+Extra match search is available on the following module search sub\-commands:
+\fI\%avail\fP, \fI\%whatis\fP and \fI\%paths\fP\&.
+.sp
+Extra match search is triggered when:
+.INDENT 0.0
+.IP \(bu 2
+\fI\%Module variants\fP and their available values have to be reported in
+avail output (see \fI\%\-\-output\fP/\fI\%\-o\fP option): extra match
+search is triggered to collect variant information
+.IP \(bu 2
+Module variant is specified in search query: extra match search is triggered
+to collect variant information then match them against variant specified in
+query
+.IP \(bu 2
+\fI\%Extra specifier\fP is specified in search query: extra match search is
+triggered to collect commands used in modulefiles or modulercs then match
+them against extra specifier query
+.UNINDENT
+.sp
+If search query does not contain an extra query and if variant information
+should not be reported, no extra match search is performed. If search query
+does not contain any module name and version but contains an extra query or if
+variant information should be reported, extra match search is applied to all
+available modulefiles.
+.sp
+During this specific evaluation, modulefiles are interpreted in \fIscan\fP mode.
+This mode aims to collect the different Tcl modulefile commands used. Special
+care should be given when writing modulefiles to ensure they cope with such
+evaluation mode.
+.sp
+Modulefiles tagged \fIforbidden\fP are excluded from extra match search
+evaluation. Thus they are excluded from result when this mechanism is
+triggered.
+.sp
+No \fIscan\fP modulefile evaluation is performed if search query is only composed
+of \fBtag\fP extra specifier. Module tags are defined in modulercs thus no
+modulefile evaluation is required to get tags applying to a modulefile.
+.sp
+As extra match search implies additional modulefile evaluations, it is advised
+to build and use \fI\%Module cache\fP to improve search speed.
+.SS Collections
+.sp
+Collections describe a sequence of \fI\%module use\fP then
+\fI\%module load\fP commands that are interpreted by
+\fBmodulecmd.tcl\fP to set the user environment as described by this
+sequence.
+.sp
+Collections are generated by the \fI\%save\fP sub\-command that dumps the
+current user environment state in terms of module paths and loaded modules. By
+default collections are saved under the \fB$HOME/.module\fP directory.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module list
+Currently Loaded Modulefiles:
+ 1) foo/1.2   2) bar/2.0   3) qux/3.5
+$ module save foo
+$ cat $HOME/.module/foo
+module use \-\-append /path/to/modulefiles
+module load foo
+module load bar/2.0
+module load qux/3.5
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+The content of a collection can also be displayed with the \fI\%saveshow\fP
+sub\-command. Note that in the above example, bare module name is recorded for
+\fBfoo\fP modulefile as loaded version is the implicit default. Loaded version
+recording can be enforced by enabling \fI\%collection_pin_version\fP
+configuration option.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module config collection_pin_version 1
+$ module save foo
+$ module saveshow foo
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+/home/user/.module/foo:
+
+module use \-\-append /path/to/modulefiles
+module load foo/1.2
+module load bar/2.0
+module load qux/3.5
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+When a collection is activated, with the \fI\%restore\fP
+sub\-command, module paths and loaded modules are unused or unloaded if they
+are not part or if they are not ordered the same way as in the collection.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module list
+Currently Loaded Modulefiles:
+ 1) foo/1.2   2) bar/2.1   3) qux/3.5
+$ module restore foo
+Unloading qux/3.5
+Unloading bar/2.1
+Loading bar/2.0
+Loading qux/3.5
+$ module list
+Currently Loaded Modulefiles:
+ 1) foo/1.2   2) bar/2.0   3) qux/3.5
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In the above example, second and third module loaded are changed. First loaded
+module is not changed or reloaded as it is the same module between current
+environment and collection. As second loaded module was different, this module
+and all those loaded afterward are unloaded to then load the sequence
+described by collection. As a result, third loaded module is reloaded, even if
+is was the same module between current environment and collection.
+.sp
+Existing collections can be listed with \fI\%savelist\fP sub\-command. They
+can be deleted with \fI\%saverm\fP sub\-command.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module savelist
+Named collection list:
+ 1) default   2) foo
+$ module saverm default
+$ module savelist
+Named collection list:
+ 1) foo
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+When no argument is provided to \fI\%save\fP, \fI\%restore\fP,
+\fI\%saveshow\fP or \fI\%saverm\fP sub\-commands, the \fBdefault\fP
+collection is assumed.
+.sp
+Collection can also be specified as a full pathname:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module save /path/to/collections/bar
+$ module saveshow /path/to/collections/bar
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+/path/to/collections/bar:
+
+module use \-\-append /path/to/modulefiles
+module load foo/1.2
+module load bar/2.0
+module load qux/3.5
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Initial environment
+.sp
+Initial environment state, which corresponds to modulepaths enabled and
+modules loaded during \fI\%Modules initialization\fP,
+is referred as the \fB__init__\fP collection. This collection is virtual as
+its content is stored in the \fI\%__MODULES_LMINIT\fP and not in a file. It
+can be displayed with \fI\%saveshow\fP and restored with \fI\%restore\fP
+sub\-command.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module saveshow __init__
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+initial environment:
+
+module use \-\-append /path/to/modulefiles
+module load foo/1.2
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+If the \fBdefault\fP collection does not exist, \fI\%saveshow\fP and
+\fI\%restore\fP sub\-commands assume \fB__init__\fP collection when no argument
+provided to them.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module list
+Currently Loaded Modulefiles:
+ 1) foo/1.2   2) bar/2.1   3) qux/3.5
+$ module savelist
+Named collection list:
+ 1) foo
+$ module restore
+Unloading qux/3.5
+Unloading bar/2.1
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Initial environment state can also be restored with the \fI\%reset\fP
+sub\-command. This sub\-command behavior can be changed with
+\fI\%reset_target_state\fP configuration option to choose to just purge
+loaded modules or to restore a specific collection.
+.SS Collection targets
+.sp
+A collection target can be defined for current environment session with the
+\fI\%collection_target\fP configuration option. When set, available
+collections are reduced to those suffixed with target name. Which means
+\fI\%restore\fP, \fI\%saveshow\fP, \fI\%savelist\fP and \fI\%saverm\fP
+only find collections matching currently set target.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module savelist
+Named collection list:
+ 1) foo
+$ module config collection_target mytarget
+$ module savelist
+No named collection (for target \(dqmytarget\(dq).
+$ module restore foo
+ERROR: Collection foo (for target \(dqmytarget\(dq) cannot be found
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+When saving a new collection, generated file is suffixed with currently set
+target name.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module save bar
+$ module savelist
+Named collection list (for target \(dqmytarget\(dq):
+ 1) bar
+$ ls $HOME/.module
+bar.mytarget  foo
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Collection targets help to distinguish contexts and make collection reachable
+only from the context they have been made for. For instance the same user
+account may be used to access different OSes or machine architectures. With a
+target set, users are ensured to only access collections built for the context
+they are currently connected to. See also \fI\%MODULES_COLLECTION_TARGET\fP
+section.
+.SS Stash collections
+.sp
+Current user environment can be stashed with \fI\%stash\fP sub\-command. When
+this sub\-command is called, current module environment is saved in a stash
+collection then \fI\%initial environment\fP is restored.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module list
+Currently Loaded Modulefiles:
+ 1) foo/1.2   2) qux/4.2
+$ module stash
+Unloading qux/4.2
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Specific sub\-commands are available to handle stash collections:
+\fI\%stashpop\fP, \fI\%stashlist\fP, \fI\%stashshow\fP,
+\fI\%stashrm\fP and \fI\%stashclear\fP\&. A stash collection is restored
+with \fI\%stashpop\fP which also deletes the collection once restored.
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module stashlist
+Stash collection list (for target \(dqmytarget\(dq):
+ 0) stash\-1667669750191
+$ module stashpop
+Loading qux/4.2
+$ module stashlist
+No stash collection (for target \(dqmytarget\(dq).
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Stash collections have same format and are saved in the same location than
+other collections. Collection target also applies to stash collection.
+Creation timestamp is saved in stash collection name.
+.sp
+Stash collection can be designated by their full collection name (i.e.,
+\fIstash\-<creation_timestamp>\fP) or a stash index. Most recent stash
+collection has index \fI0\fP, \fI1\fP is the one before it. When no argument is
+provided on stash sub\-commands, the latest stash collection is assumed (that
+is stash index \fI0\fP).
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ module stashlist
+Stash collection list (for target \(dqmytarget\(dq):
+ 0) stash\-1667669750783   1) stash\-1667669750253
+$ module stashshow 1
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+/home/user/.module/stash\-1667669750253.mytarget:
+
+module use \-\-append /path/to/modulefiles
+module load foo/1.2
+module load bar/2.0
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Site\-specific configuration
+.sp
+Siteconfig, the site\-specific configuration script, is a way to extend
+\fBmodulecmd.tcl\fP\&. Siteconfig is a Tcl script. Its location is
+\fB@etcdir@/siteconfig.tcl\fP\&.
+.sp
+When \fBmodulecmd.tcl\fP is invoked it sources siteconfig script if it
+exists. Any global variable or procedure of \fBmodulecmd.tcl\fP can be
+redefined in siteconfig.
+.sp
+An additional siteconfig script may be specified through the
+\fI\%extra_siteconfig\fP configuration option. The
+\fI\%MODULES_SITECONFIG\fP environment variable is defined by
+\fI\%config\fP sub\-command when setting \fI\%extra_siteconfig\fP\&. If it
+exists the extra siteconfig is sourced by \fBmodulecmd.tcl\fP right after
+main siteconfig script.
+.SS Hooks
+.sp
+Siteconfig relies on the ability of the Tcl language to overwrite previously
+defined variables and procedures. Sites may deploy their own Tcl code in
+siteconfig to adapt \fBmodulecmd.tcl\fP to their specific needs. The
+\fBtrace\fP Tcl command may especially be used to define hooks that are run when
+entering or leaving a given procedure, or when a variable is read or written.
+See \fBtrace(n)\fP man page for detailed information. The following
+example setup a procedure that is executed before each modulefile evaluation:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+proc beforeEval {cmdstring code result op} {
+   # code to run right before each modulefile evaluation
+}
+trace add execution execute\-modulefile enter beforeEval
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Another possibility is to override the definition of an existing procedure by
+first renaming its original version then creating a new procedure that will add
+specific code and rely on the renamed original procedure for the rest. See
+\fBrename(n)\fP man page for details. As an example, the following code
+adds a new query option to the \fI\%module\-info\fP modulefile command:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+rename module\-info __module\-info
+proc module\-info {what {more {}}} {
+   switch \-\- $what {
+      platform { return myhost\-$::tcl_platform(machine) }
+      default { return [__module\-info $what $more] }
+   }
+}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SS Siteconfig hook variables
+.sp
+Some Tcl variables can be defined in siteconfig script with special hook
+meaning. The following variables are recognized:
+.INDENT 0.0
+.TP
+.B modulefile_extra_vars
+List of variable names and associated values to setup in modulefile
+evaluation context. These variables can be accessed when modulefile is
+executed. In case code in a modulefile changes the value of such variable,
+its value is reset to the one defined in \fI\%modulefile_extra_vars\fP
+prior the evaluation of the next modulefile.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+set modulefile_extra_vars {myvar 1 othervar {some text}}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In the above siteconfig example, \fI\%modulefile_extra_vars\fP sets the
+\fBmyvar\fP and \fBothervar\fP variables in the modulefile evaluation context
+with respectively \fB1\fP and \fBsome text\fP as value.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B modulefile_extra_cmds
+List of command and associated local procedure to setup in modulefile
+evaluation context. These commands can be called from the modulefile to
+execute associated procedure. In case a modulefile changes the definition
+of such command, its definition is bound again on the procedure defined in
+\fI\%modulefile_extra_cmds\fP prior the evaluation of the next modulefile.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+proc mycmd {} {
+    # Tcl code
+}
+proc anotherproc {args} {
+    # Tcl code
+}
+set modulefile_extra_cmds {mycmd mycmd othercmd anotherproc}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In the above siteconfig example, \fI\%modulefile_extra_cmds\fP sets the
+\fBmycmd\fP and \fBothercmd\fP commands in the modulefile evaluation context and
+bind them respectively to the \fBmycmd\fP and \fBanotherproc\fP procedures
+defined in siteconfig script.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B modulerc_extra_vars
+List of variable names and associated values to setup in modulerc evaluation
+context. These variables can be accessed when modulerc is executed. In case
+code in a modulerc changes the value of such variable, its value
+is reset to the one defined in \fI\%modulerc_extra_vars\fP prior the
+evaluation of the next modulerc.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+set modulerc_extra_vars {myvar 1 othervar {some text}}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In the above siteconfig example, \fI\%modulerc_extra_vars\fP sets the
+\fBmyvar\fP and \fBothervar\fP variables in the modulerc evaluation context with
+respectively \fB1\fP and \fBsome text\fP as value.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B modulerc_extra_cmds
+List of command and associated local procedure to setup in modulerc
+evaluation context. These commands can be called from the modulerc to execute
+associated procedure. In case a modulerc changes the definition of such
+command, its definition is bound again on the procedure defined in
+\fI\%modulerc_extra_cmds\fP prior the evaluation of the next modulerc.
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+proc mycmd {} {
+    # Tcl code
+}
+proc anotherproc {args} {
+    # Tcl code
+}
+set modulerc_extra_cmds {mycmd mycmd othercmd anotherproc}
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In the above siteconfig example, \fI\%modulerc_extra_cmds\fP sets the
+\fBmycmd\fP and \fBothercmd\fP commands in the modulerc evaluation context and
+bind them respectively to the \fBmycmd\fP and \fBanotherproc\fP procedures
+defined in siteconfig script.
+.UNINDENT
+.SS Module cache
+.sp
+To improve module search efficiency, a module cache can be setup in each
+modulepath. A module cache is represented by a \fB\&.modulecache\fP file
+stored at the root of modulepath directory. This file aggregates contents of
+all valid modulercs and modulefiles and issue description of all
+non\-modulefiles stored in modulepath directory.
+.sp
+When cache file is available, a module search analyzes this file rather
+walking through the content of modulepath directory to check if files are
+modulefiles or not. Cache file reduces module search processing time
+especially when hundreds of modulefiles are available and if these files are
+located on busy storage systems. Having one file to read per modulepath rather
+walking through a whole directory content extremely reduces the number of
+required I/O operations.
+.sp
+When modulefiles or directories in the modulepath are not accessible for
+everyone, a \fIlimited access\fP indication is recorded in cache file rather
+content of these modulefiles and content of these directories. When cache file
+containing such indication is processed, the limited access modulefiles are
+tested to check if they are available to the current running user. Limited
+access directories are walked down to find all available modulefiles and
+modulercs.
+.sp
+Cache files are generated with \fI\%cachebuild\fP sub\-command. This command
+has to be run by someone who owns write access in modulepath directory to
+create cache file.
+.sp
+Cache files are used any time a module search occurs in modulepaths. They are
+analyzed for instance during \fI\%avail\fP, \fI\%load\fP,
+\fI\%display\fP or \fI\%whatis\fP sub\-commands.
+.sp
+Cache files are removed with \fI\%cacheclear\fP sub\-command. This command
+has to be run by someone who own write access in modulepath directory to
+effectively delete cache file.
+.SH EXIT STATUS
+.sp
+The \fBmodule\fP command exits with \fB0\fP if its execution succeed.
+Otherwise \fB1\fP is returned.
+.SH ENVIRONMENT
+.INDENT 0.0
+.TP
+.B __MODULES_AUTOINIT_INPROGRESS
+If set to \fB1\fP, the \fBautoinit\fP sub\-command process is skipped.
+.sp
+This environment variable is set to \fB1\fP by the \fBautoinit\fP
+sub\-command after checking it is not set. It ensures no nested initialization
+of Modules occur. At the end of the processing of the \fBautoinit\fP
+sub\-command, \fI\%__MODULES_AUTOINIT_INPROGRESS\fP is unset.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMALTNAME
+A colon separated list of the alternative names set through
+\fI\%module\-version\fP and \fI\%module\-alias\fP statements corresponding to
+all loaded \fImodulefiles\fP\&. Each element in this list starts by the name of the
+loaded \fImodulefile\fP followed by all alternative names resolving to it. The
+loaded modulefile and its alternative names are separated by the ampersand
+character.
+.sp
+Each alternative name stored in \fI\%__MODULES_LMALTNAME\fP is prefixed by
+the \fBal|\fP string if it corresponds to a module alias or prefixed by the
+\fBas|\fP string if it corresponds to an automatic version symbol. These
+prefixes help to distinguish the different kind of alternative name.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the alternative names matching loaded \fImodulefiles\fP
+in order to keep environment consistent when conflicts or pre\-requirements
+are set over these alternative designations. It also helps to find a match
+after \fImodulefiles\fP being loaded when \fI\%unload\fP, \fI\%is\-loaded\fP
+or \fI\%info\-loaded\fP actions are run over these names.
+.sp
+Starting version 4.7 of Modules, \fI\%__MODULES_LMALTNAME\fP is also used
+on \fI\%list\fP sub\-command to report the symbolic versions associated with
+the loaded modules.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMCONFLICT
+A colon separated list of the \fI\%conflict\fP statements defined by all
+loaded \fImodulefiles\fP\&. Each element in this list starts by the name of the
+loaded \fImodulefile\fP declaring the conflict followed by the name of all
+modulefiles it declares a conflict with. These loaded modulefiles and
+conflicting modulefile names are separated by the ampersand character.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the conflicts declared by the loaded \fImodulefiles\fP
+in order to keep environment consistent when a conflicting module is asked
+for load afterward.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMEXTRATAG
+A colon separated list of the tags corresponding to all loaded \fImodulefiles\fP
+that have been set through the \fI\%\-\-tag\fP option. Each element in this
+list starts by the name of the loaded \fImodulefile\fP followed by all explicitly
+set tags applying to it. The loaded modulefile and its tags are separated by
+the ampersand character.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to distinguish from all tags those that have been specifically set with
+\fI\%\-\-tag\fP option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMINIT
+A colon separated list describing the modulepaths that have been enabled and
+the \fImodulefiles\fP that have been loaded with their tags during \fI\%Modules
+initialization\fP\&. Each element in this list
+corresponds to a \fI\%collection\fP definition line.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the initial loaded state after initialization.
+.sp
+This initial environment state can then be restored with \fI\%reset\fP
+sub\-command. It can also be restored with \fI\%restore\fP sub\-command when
+\fB__init__\fP collection name is specified or when no collection name is
+specified and no \fIdefault\fP collection exists.
+.sp
+The content of the initial environment can be displayed with
+\fI\%saveshow\fP sub\-command when \fB__init__\fP collection name is specified
+or when no collection name is specified and no \fIdefault\fP collection exists.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMPREREQ
+A colon separated list of the \fI\%prereq\fP statements defined by all
+loaded \fImodulefiles\fP\&. Each element in this list starts by the name of the
+loaded \fImodulefile\fP declaring the pre\-requirement followed by the name of all
+modulefiles it declares a \fI\%prereq\fP with. These loaded modulefiles and
+pre\-required modulefile names are separated by the ampersand character. When
+a \fI\%prereq\fP statement is composed of multiple modulefiles, these
+modulefile names are separated by the pipe character.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the pre\-requirement declared by the loaded
+\fImodulefiles\fP in order to keep environment consistent when a pre\-required
+module is asked for unload afterward.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMREFRESH
+A colon separated list of the loaded modules that are qualified for refresh
+evaluation. Loaded modules listed in this variable are those defining
+volatile environment changes like shell completion, alias and function.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMSOURCESH
+A colon separated list of the \fI\%source\-sh\fP statements defined by all
+loaded \fImodulefiles\fP\&. Each element in this list starts by the name of the
+loaded \fImodulefile\fP declaring the environment changes made by the evaluation
+of \fI\%source\-sh\fP scripts. This name is followed by each
+\fI\%source\-sh\fP statement call and corresponding result achieved in
+modulefile. The loaded modulefile name and each \fI\%source\-sh\fP statement
+description are separated by the ampersand character. The \fI\%source\-sh\fP
+statement call and each resulting modulefile command (corresponding to the
+environment changes done by sourced script) are separated by the pipe
+character.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the modulefile commands applied for each
+\fI\%source\-sh\fP command when loading the modulefile. In order to reverse
+these modulefile commands when modulefile is unloaded to undo the environment
+changes.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMSTICKYRULE
+A colon separated list of the sticky or super\-sticky tag definitions applying
+to loaded \fImodulefiles\fP\&. Each element in this list starts by the name of the
+loaded \fImodulefile\fP followed by the sticky tag name and the module
+specifications on which the tag applies. These loaded modulefiles and sticky
+tag definitions are separated by the ampersand character. Tag name and module
+specifications on which it applies are separated by the pipe character.
+.sp
+When stickiness applies specifically to the loaded module name and version,
+sticky rule is not recorded in \fB__MODULES_LMSTICKYRULE\fP\&.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the stickiness scope when sticky module is changed.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMTAG
+A colon separated list of the tags corresponding to all loaded \fImodulefiles\fP
+that have been set through \fI\%module\-tag\fP statements or from other
+modulefile statements like \fI\%module\-forbid\fP (that may apply the
+\fInearly\-forbidden\fP tag in specific situation) (see \fI\%Module tags\fP section).
+Each element in this list starts by the name of the loaded \fImodulefile\fP
+followed by all tags applying to it. The loaded modulefile and its tags are
+separated by the ampersand character.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the tags applying to loaded \fImodulefiles\fP in order
+to report these tags on \fI\%list\fP sub\-command output or to apply
+specific behavior when unloading \fImodulefile\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_LMVARIANT
+A colon separated list of the variant instantiated through \fI\%variant\fP
+statements by all loaded \fImodulefiles\fP (see \fI\%Module variants\fP section).
+Each element in this list starts by the name of the loaded \fImodulefile\fP
+followed by all the variant definitions set during the load of this module.
+The loaded modulefile and each of its variant definition are separated by the
+ampersand character. Each variant definition starts with the variant name,
+followed by the variant value set, then a flag to know if variant is of the
+Boolean type and last element in this definition is a flag to know if the
+chosen value is the default one for this variant and if it has been
+automatically set or not. These four elements composing the variant
+definition are separated by the pipe character.
+.sp
+This environment variable is intended for \fBmodule\fP command internal
+use to get knowledge of the variant value defined by the loaded \fImodulefiles\fP
+in order to keep environment consistent when requirements are set over a
+specific variant value or just to report these variant values when listing
+loaded modules.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_PUSHENV_<VAR>
+Stack of saved values for \fB<VAR>\fP environment variable. A colon\-separated list containing pairs of elements. A pair is formed by a loaded
+module name followed by the value set to \fB<VAR>\fP in this module with
+\fI\%pushenv\fP command. An ampersand character separates the two parts of
+the pair.
+.sp
+First element in list corresponds to the lastly set value of \fB<VAR>\fP\&.
+If a value were set to \fB<VAR>\fP prior the first evaluated
+\fI\%pushenv\fP command, this value is associated to an empty module name to
+record it as a pair element in \fI\%__MODULES_PUSHENV_<VAR>\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_QUAR_<VAR>
+Value of environment variable \fB<VAR>\fP passed to \fBmodulecmd.tcl\fP
+in order to restore \fB<VAR>\fP to this value once started.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_QUARANTINE_SET
+If set to \fB1\fP, restore the environment variables set on hold by the
+quarantine mechanism when starting \fBmodulecmd.tcl\fP script. This
+variable is automatically defined by Modules shell initialization scripts or
+\fBmodule\fP shell function when they apply the quarantine mechanism.
+(see \fI\%MODULES_QUARANTINE_SUPPORT\fP).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B __MODULES_SHARE_<VAR>
+Reference counter variable for path\-like variable \fB<VAR>\fP\&. A colon
+separated list containing pairs of elements. A pair is formed by a path
+element followed its usage counter which represents the number of times
+this path has been enabled in variable \fB<VAR>\fP\&. A colon separates the
+two parts of the pair.
+.sp
+An element of a path\-like variable is added to the reference counter variable
+as soon as it is added more than one time. When an element of a path\-like
+variable is not found in the reference counter variable, it means this
+element has only be added once to the path\-like variable.
+.sp
+When an empty string is added as an element in the path\-like variable, it is
+added to the reference counter variable even if added only once to
+distinguish between an empty path\-like variable and a path\-like variable
+containing an empty string as single element.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B _LMFILES_
+A colon separated list of the full pathname for all loaded \fImodulefiles\fP\&.
+.sp
+This environment variable is generated by \fBmodule\fP command and
+should not be modified externally.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B LOADEDMODULES
+A colon separated list of all loaded \fImodulefiles\fP\&.
+.sp
+This environment variable is generated by \fBmodule\fP command and
+should not be modified externally.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULECONTACT
+Email address to contact in case any issue occurs during the interpretation
+of modulefiles.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%contact\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULEPATH
+The path that the \fBmodule\fP command searches when looking for
+\fImodulefiles\fP\&. Typically, it is set to the main \fImodulefiles\fP directory,
+\fB@modulefilesdir@\fP, by the initialization script. \fI\%MODULEPATH\fP
+can be set using \fI\%module use\fP or by the module initialization
+script to search group or personal \fImodulefile\fP directories before or after
+the main \fImodulefile\fP directory.
+.sp
+Path elements registered in the \fI\%MODULEPATH\fP environment variable may
+contain reference to environment variables which are converted to their
+corresponding value by \fBmodule\fP command each time it looks at the
+\fI\%MODULEPATH\fP value. If an environment variable referred in a path
+element is not defined, its reference is converted to an empty string.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULERCFILE
+The location of a global run\-command file(s) containing \fImodulefile\fP specific
+setup. See \fI\%Modulecmd startup\fP section for detailed information.
+.sp
+Several global run\-command files may be defined in this environment variable
+by separating each of them by colon character.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%rcfile\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_ABORT_ON_ERROR
+A colon separated list of the module sub\-commands that abort their evaluation
+sequence when an error is raised by an evaluated module. When error occurs,
+evaluations already done are withdrawn and the remaining modules to evaluate
+are skipped.
+.sp
+Accepted sub\-commands that can be set in value list are:
+.INDENT 7.0
+.IP \(bu 2
+\fI\%load\fP
+.IP \(bu 2
+\fBml\fP
+.IP \(bu 2
+\fI\%mod\-to\-sh\fP
+.IP \(bu 2
+\fI\%purge\fP
+.IP \(bu 2
+\fI\%reload\fP
+.IP \(bu 2
+\fI\%switch\fP
+.IP \(bu 2
+\fI\%switch_unload\fP
+.IP \(bu 2
+\fI\%try\-load\fP
+.IP \(bu 2
+\fI\%unload\fP
+.UNINDENT
+.sp
+Module sub\-commands not configured to follow the \fIabort on error\fP behavior,
+apply the \fIcontinue on error\fP behavior. In this case if one modulefile
+evaluation fails, sequence continues with remaining modulefiles. When
+\fI\%\-\-force\fP option is used, \fIcontinue on error\fP behavior applies.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%abort_on_error\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_ADVANCED_VERSION_SPEC
+If set to \fB1\fP, enable advanced module version specifiers (see \fI\%Advanced
+module version specifiers\fP section). If set to \fB0\fP, disable advanced
+module version specifiers.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%advanced_version_spec\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_AUTO_HANDLING
+If set to \fB1\fP, enable automated module handling mode. If set to \fB0\fP
+disable automated module handling mode. Other values are ignored.
+.sp
+Automated module handling mode consists in additional actions triggered when
+loading or unloading a \fImodulefile\fP to satisfy the constraints it declares.
+When loading a \fImodulefile\fP, following actions are triggered:
+.INDENT 7.0
+.IP \(bu 2
+Requirement Load: load of the \fImodulefiles\fP declared as a \fI\%prereq\fP
+of the loading \fImodulefile\fP\&.
+.IP \(bu 2
+Dependent Reload: reload of the modulefiles declaring a \fI\%prereq\fP
+onto loaded \fImodulefile\fP or declaring a \fI\%prereq\fP onto a \fImodulefile\fP
+part of this reloading batch.
+.UNINDENT
+.sp
+When unloading a \fImodulefile\fP, following actions are triggered:
+.INDENT 7.0
+.IP \(bu 2
+Dependent Unload: unload of the modulefiles declaring a non\-optional
+\fI\%prereq\fP onto unloaded modulefile or declaring a non\-optional
+\fI\%prereq\fP onto a modulefile part of this unloading batch. A
+\fI\%prereq\fP modulefile is considered optional if the \fI\%prereq\fP
+definition order is made of multiple modulefiles and at least one
+alternative modulefile is loaded.
+.IP \(bu 2
+Useless Requirement Unload: unload of the \fI\%prereq\fP modulefiles that
+have been automatically loaded for either the unloaded modulefile, an
+unloaded dependent modulefile or a modulefile part of this useless
+requirement unloading batch. Modulefiles are added to this unloading batch
+only if they are not required by any other loaded modulefiles and if they
+are not tagged \fBkeep\-loaded\fP\&.
+.IP \(bu 2
+Dependent Reload: reload of the modulefiles declaring a \fI\%conflict\fP
+or an optional \fI\%prereq\fP onto either the unloaded modulefile, an
+unloaded dependent or an unloaded useless requirement or declaring a
+\fI\%prereq\fP onto a modulefile part of this reloading batch.
+.UNINDENT
+.sp
+In case a loaded \fImodulefile\fP has some of its declared constraints
+unsatisfied (pre\-required modulefile not loaded or conflicting modulefile
+loaded for instance), this loaded \fImodulefile\fP is excluded from the automatic
+reload actions described above.
+.sp
+For the specific case of the \fI\%switch\fP sub\-command, where a modulefile
+is unloaded to then load another modulefile. Dependent modulefiles to Unload
+are merged into the Dependent modulefiles to Reload that are reloaded after
+the load of the switched\-to modulefile.
+.sp
+This environment variable value supersedes the default value set on the
+\fI\%auto_handling\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-auto\fP and \fI\%\-\-no\-auto\fP
+command line switches override this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_AVAIL_INDEPTH
+If set to \fB1\fP, enable in depth search results for \fI\%avail\fP
+sub\-command. If set to \fB0\fP disable \fI\%avail\fP sub\-command in depth
+mode. Other values are ignored.
+.sp
+When in depth mode is enabled, modulefiles and directories contained in
+directories matching search query are also included in search results. When
+disabled these modulefiles and directories contained in matching directories
+are excluded.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%avail_indepth\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-indepth\fP and
+\fI\%\-\-no\-indepth\fP command line switches override this environment
+variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_AVAIL_OUTPUT
+A colon separated list of the elements to report in addition to module names
+on \fI\%avail\fP sub\-command regular output mode.
+.sp
+Accepted elements that can be set in value list are:
+.INDENT 7.0
+.IP \(bu 2
+\fBalias\fP: module aliases.
+.IP \(bu 2
+\fBdirwsym\fP: directories associated with symbolic versions.
+.IP \(bu 2
+\fBindesym\fP: symbolic versions reported independently from the module or
+directory they are attached to.
+.IP \(bu 2
+\fBkey\fP: legend appended at the end of the output to explain it.
+.IP \(bu 2
+\fBmodulepath\fP: modulepath names set as header prior the list of available
+modules found in them.
+.IP \(bu 2
+\fBsym\fP: symbolic versions associated with available modules.
+.IP \(bu 2
+\fBtag\fP: tags associated with available modules.
+.IP \(bu 2
+\fBvariant\fP: variants and their possible values associated with available
+modules.
+.IP \(bu 2
+\fBvariantifspec\fP: like \fBvariant\fP but only if a variant has been
+specified in search query.
+.UNINDENT
+.sp
+The order of the elements in the list does not matter. Module names are the
+only content reported when \fILIST\fP is set to an empty value.
+.sp
+In case the \fBmodulepath\fP element is missing from value list, the available
+modules from global/user rc and all enabled modulepaths are reported as a
+single list.
+.sp
+When \fBindesym\fP element is set, \fBdirwsym\fP and \fBsym\fP elements are
+disabled.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%avail_output\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command. The \fI\%\-\-output\fP/\fI\%\-o\fP command
+line switches override this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_AVAIL_TERSE_OUTPUT
+A colon separated list of the elements to report in addition to module names
+on \fI\%avail\fP sub\-command terse output mode.
+.sp
+See \fI\%MODULES_AVAIL_OUTPUT\fP to get the accepted elements that can be
+set in value list.
+.sp
+The order of the elements in the list does not matter. Module names are the
+only content reported when \fILIST\fP is set to an empty value.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%avail_terse_output\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command. The \fI\%\-\-output\fP/\fI\%\-o\fP
+command line switches override this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_CACHE_BUFFER_BYTES
+Size of the buffer used when reading or writing cache files. Accepted values
+are integers comprised between 4096 and 1000000.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_CACHE_EXPIRY_SECS
+Number of seconds a cache file is considered valid after being generated. For
+example, if set to \fB3600\fP it means a cache file expires one hour after
+being generated and is then ignored.
+.sp
+When set to \fB0\fP cache file never expires. Accepted values are integers
+comprised between 0 (cache files never expire) and 31536000 (equivalent to
+one year duration).
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_CMD
+The location of the active module command script.
+.sp
+This environment variable is generated by \fBmodule\fP command and
+should not be modified externally.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_COLLECTION_PIN_VERSION
+If set to \fB1\fP, register exact version number of modulefiles when saving a
+collection. Otherwise modulefile version number is omitted if it corresponds
+to the explicitly set default version and also to the implicit default when
+the configuration option \fI\%implicit_default\fP is enabled.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%collection_pin_version\fP configuration option. It can be defined
+with the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_COLLECTION_PIN_TAG
+If set to \fB1\fP, register all tags applying to modulefiles when saving a
+collection. Otherwise only the extra tags set through the \fI\%\-\-tag\fP
+option and tags resulting from specific module states (like \fBauto\-loaded\fP
+and \fBkeep\-loaded\fP tags) are recorded in collection. Note that the
+\fBnearly\-forbidden\fP tag due to its temporal meaning is not saved in
+collection even when this configuration option is enabled.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%collection_pin_tag\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_COLLECTION_TARGET
+The collection target that determines what collections are valid thus
+reachable on the current system.
+.sp
+Collection directory may sometimes be shared on multiple machines which may
+use different modules setup. For instance modules users may access with the
+same \fBHOME\fP directory multiple systems using different OS versions.
+When it happens a collection made on machine 1 may be erroneous on machine 2.
+.sp
+When a target is set, only the collections made for that target are
+available to the \fI\%restore\fP, \fI\%savelist\fP, \fI\%saveshow\fP,
+\fI\%saverm\fP, \fI\%stash\fP, \fI\%stashpop\fP, \fI\%stashlist\fP,
+\fI\%stashshow\fP, and \fI\%stashrm\fP sub\-commands. Saving a collection
+registers the target footprint by suffixing the collection filename with
+\fB\&.$MODULES_COLLECTION_TARGET\fP\&. The collection target is not involved when
+collection is specified as file path on the \fI\%saveshow\fP,
+\fI\%restore\fP and \fI\%save\fP sub\-commands.
+.sp
+For example, the \fI\%MODULES_COLLECTION_TARGET\fP variable may be set with
+results from commands like \fBlsb_release\fP, \fBhostname\fP,
+\fBdnsdomainname\fP, etc.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%collection_target\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_COLOR
+Defines if output should be colored or not. Accepted values are \fBnever\fP,
+\fBauto\fP and \fBalways\fP\&.
+.sp
+When color mode is set to \fBauto\fP, output is colored only if the standard
+error output channel is attached to a terminal.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%color\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-color\fP command line switch
+overrides this environment variable.
+.sp
+\fBNO_COLOR\fP, \fBCLICOLOR\fP and \fBCLICOLOR_FORCE\fP
+environment variables are also honored to define color mode. The \fBnever\fP
+mode is set if \fBNO_COLOR\fP is defined (regardless of its value) or if
+\fBCLICOLOR\fP equals to \fB0\fP\&. If \fBCLICOLOR\fP is set to another
+value, it corresponds to the \fBauto\fP mode. The \fBalways\fP mode is set if
+\fBCLICOLOR_FORCE\fP is set to a value different than \fB0\fP\&.
+\fBNO_COLOR\fP variable prevails over \fBCLICOLOR\fP and
+\fBCLICOLOR_FORCE\fP\&. Color mode set with these three variables is
+superseded by mode set with \fI\%MODULES_COLOR\fP environment variable or
+with \fI\%\-\-color\fP command line switch..
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_COLORS
+Specifies the colors and other attributes used to highlight various parts of
+the output. Its value is a colon\-separated list of output items associated to
+a Select Graphic Rendition (SGR) code. It follows the same syntax than
+\fBLS_COLORS\fP\&.
+.sp
+Output items are designated by keys. Items able to be colorized are:
+highlighted element (\fBhi\fP), debug information (\fBdb\fP), trace information
+(\fBtr\fP), tag separator (\fBse\fP); Error (\fBer\fP), warning (\fBwa\fP), module
+error (\fBme\fP) and info (\fBin\fP) message prefixes; Modulepath (\fBmp\fP),
+directory (\fBdi\fP), module alias (\fBal\fP), module variant (\fBva\fP), module
+symbolic version (\fBsy\fP), module \fBdefault\fP version (\fBde\fP) and modulefile
+command (\fBcm\fP).
+.sp
+\fI\%Module tags\fP can also be colorized. The key to set in the color palette to
+get a graphical rendering of a tag is the tag name or the tag abbreviation if
+one is defined for tag. The SGR code applied to a tag name is ignored if an
+abbreviation is set for this tag thus the SGR code should be defined for this
+abbreviation to get a graphical rendering. Each basic tag has by default a
+key set in the color palette, based on its abbreviated string: auto\-loaded
+(\fBaL\fP), forbidden (\fBF\fP), hidden and hidden\-loaded (\fBH\fP), loaded
+(\fBL\fP), nearly\-forbidden (\fBnF\fP), sticky (\fBS\fP), super\-sticky (\fBsS\fP) and
+keep\-loaded (\fBkL\fP).
+.sp
+See the Select Graphic Rendition (SGR) section in the documentation of the
+text terminal that is used for permitted values and their meaning as
+character attributes. These substring values are integers in decimal
+representation and can be concatenated with semicolons. Modules takes care of
+assembling the result into a complete SGR sequence (\fB\e33[...m\fP). Common
+values to concatenate include \fB1\fP for bold, \fB4\fP for underline, \fB30\fP to
+\fB37\fP for foreground colors and \fB90\fP to \fB97\fP for 16\-color mode
+foreground colors. See also \fI\%https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters\fP
+for a complete SGR code reference.
+.sp
+No graphical rendition will be applied to an output item that could normally
+be colored but which is not defined in the color set. Thus if
+\fI\%MODULES_COLORS\fP is defined empty, no output will be colored at all.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%colors\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_EDITOR
+Text editor command name or path for use to open modulefile through the
+\fI\%edit\fP sub\-command.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%editor\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.sp
+Text editor could also be defined through the \fBVISUAL\fP or
+\fBEDITOR\fP environment variables. These environment variables are
+overridden by \fI\%MODULES_EDITOR\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_EXTENDED_DEFAULT
+If set to \fB1\fP, a specified module version is matched against starting
+portion of existing module versions, where portion is a substring separated
+from the rest of the version string by a \fB\&.\fP character. For example
+specified modules \fBmod/1\fP and \fBmod/1.2\fP will match existing modulefile
+\fBmod/1.2.3\fP\&.
+.sp
+In case multiple modulefiles match the specified module version and a single
+module has to be selected, the explicitly set default version is returned if
+it is part of matching modulefiles. Otherwise the implicit default among
+matching modulefiles is returned if defined (see
+\fI\%MODULES_IMPLICIT_DEFAULT\fP section)
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%extended_default\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_FAMILY_<NAME>
+Module name minus version that provides for the \fIname\fP family in currently
+loaded environment. This environment variable is defined through the use of
+the \fI\%family\fP modulefile command.
+.sp
+For instance if loading modulefile \fBfoo/1.0\fP defines being member of the
+\fBbar\fP family, the \fI\%MODULES_FAMILY_BAR\fP
+will be set to the \fBfoo\fP value.
+.sp
+This environment variable is generated by \fBmodule\fP command and
+should not be modified externally.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_ICASE
+When module specification are passed as argument to module sub\-commands or
+modulefile Tcl commands, defines the case sensitiveness to apply to match
+them. When \fI\%MODULES_ICASE\fP is set to \fBnever\fP, a case sensitive
+match is applied in any cases. When set to \fBsearch\fP, a case insensitive
+match is applied to the \fI\%avail\fP, \fI\%list\fP, \fI\%whatis\fP,
+\fI\%paths\fP and \fI\%savelist\fP sub\-commands. When set to \fBalways\fP,
+a case insensitive match is also applied to the other module sub\-commands
+and modulefile Tcl commands for the module specification they receive as
+argument.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%icase\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-icase\fP/\fI\%\-i\fP command line
+switches, which correspond to the \fBalways\fP mode, override this environment
+variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_IGNORE_CACHE
+Ignore (if set to \fB1\fP) or not (if set to \fB0\fP) module cache.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%ignore_cache\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-ignore\-cache\fP command line
+switch overrides this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_IGNORE_USER_RC
+Skip evaluation (if set to \fB1\fP) or not (if set to \fB0\fP) of user\-specific
+module rc file (\fB$HOME/.modulerc\fP).
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%ignore_user_rc\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-ignore\-user\-rc\fP command line
+switch overrides this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_IMPLICIT_DEFAULT
+Defines (if set to \fB1\fP) or not (if set to \fB0\fP) an implicit default
+version for modules without a default version explicitly defined (see
+\fI\%Locating Modulefiles\fP section in the \fI\%modulefile\fP man page).
+.sp
+Without either an explicit or implicit default version defined a module must
+be fully qualified (version should be specified in addition to its name) to
+get:
+.INDENT 7.0
+.IP \(bu 2
+targeted by module \fI\%load\fP, \fI\%switch\fP, \fI\%display\fP,
+\fI\%help\fP, \fI\%test\fP and \fI\%path\fP sub\-commands.
+.IP \(bu 2
+restored from a collection, unless already loaded in collection\-specified
+order.
+.IP \(bu 2
+automatically loaded by automated module handling mechanisms (see
+\fI\%MODULES_AUTO_HANDLING\fP section) when declared as module
+requirement, with \fI\%prereq\fP or \fI\%module load\fP
+modulefile commands.
+.UNINDENT
+.sp
+An error is returned in the above situations if either no explicit or
+implicit default version is defined.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%implicit_default\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. This environment variable is ignored if
+\fI\%implicit_default\fP has been declared locked in
+\fI\%locked_configs\fP configuration option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_IMPLICIT_REQUIREMENT
+Defines (if set to \fB1\fP) or not (if set to \fB0\fP) an implicit prereq or
+conflict requirement onto modules specified respectively on
+\fI\%module load\fP or \fI\%module unload\fP commands in
+modulefile. When enabled an implicit conflict requirement onto switched\-off
+module and a prereq requirement onto switched\-on module are also defined for
+\fI\%module switch\fP commands used in modulefile.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%implicit_requirement\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command. The \fB\-\-not\-req\fP option, applied to a
+\fI\%module\fP command in a modulefile, overrides this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_LIST_OUTPUT
+A colon separated list of the elements to report in addition to module names
+on \fI\%list\fP sub\-command regular output mode.
+.sp
+Accepted elements that can be set in value list are:
+.INDENT 7.0
+.IP \(bu 2
+\fBalias\fP: module aliases targeting loaded modules.
+.IP \(bu 2
+\fBheader\fP: sentence to introduce the list of loaded modules or to state
+that no modules are loaded currently.
+.IP \(bu 2
+\fBidx\fP: index position of each loaded module.
+.IP \(bu 2
+\fBindesym\fP: symbolic versions reported independently from the loaded
+module they are attached to.
+.IP \(bu 2
+\fBkey\fP: legend appended at the end of the output to explain it.
+.IP \(bu 2
+\fBvariant\fP: variant values selected for loaded modules.
+.IP \(bu 2
+\fBsym\fP: symbolic versions associated with loaded modules.
+.IP \(bu 2
+\fBtag\fP: tags associated with loaded modules.
+.UNINDENT
+.sp
+The order of the elements in the list does not matter. Module names are the
+only content reported when \fILIST\fP is set to an empty value.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%list_output\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-output\fP/\fI\%\-o\fP command
+line switches override this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_LIST_TERSE_OUTPUT
+A colon separated list of the elements to report in addition to module names
+on \fI\%list\fP sub\-command terse output mode.
+.sp
+See \fI\%MODULES_LIST_OUTPUT\fP to get the accepted elements that can be
+set in value list.
+.sp
+The order of the elements in the list does not matter. Module names are the
+only content reported when \fILIST\fP is set to an empty value.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%list_terse_output\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-output\fP/\fI\%\-o\fP command
+line switches override this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_MCOOKIE_CHECK
+If set to \fBeval\fP, the Modules magic cookie (i.e., \fB#%Module\fP
+file signature) is only checked to determine if a file is a modulefile when
+evaluating these files. If set to \fBalways\fP, the Modules magic cookie is
+also checked when searching for modules.
+.sp
+The \fBeval\fP mode is made to significantly reduce file checks when walking
+through modulepaths to search for \fImodulefiles\fP\&. Special care should be given
+to the content of modulepaths when this \fBeval\fP mode is set as the following
+kind of files are included in search results:
+.INDENT 7.0
+.IP \(bu 2
+\fImodulefiles\fP with a magic cookie requiring a higher version of
+\fBmodulecmd.tcl\fP
+.IP \(bu 2
+files not beginning with the magic cookie \fB#%Module\fP
+.IP \(bu 2
+read\-protected files
+.UNINDENT
+.sp
+When a \fI\%module cache\fP file is available for a given
+modulepath, \fBeval\fP mode is not applied as cache content is generated in
+\fBalways\fP mode.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%mcookie_check\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_MCOOKIE_VERSION_CHECK
+If set to \fB1\fP, the version set in the Modules magic cookie in modulefile
+is checked against the current version of \fBmodulecmd.tcl\fP to determine
+if the modulefile can be evaluated.
+.sp
+When a \fI\%module cache\fP file is available for a given
+modulepath, version check is considered enabled as cache content is generated
+in this mode.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%mcookie_version_check\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_ML
+If set to \fB1\fP, define \fBml\fP command when initializing Modules (see
+\fI\%Package Initialization\fP section). If set to \fB0\fP, \fBml\fP command is
+not defined.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%ml\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.sp
+To enable or disable \fBml\fP command, \fI\%MODULES_ML\fP should be set
+prior Modules initialization or the \fI\%ml\fP configuration option should
+be set in the \fBinitrc\fP configuration file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_NEARLY_FORBIDDEN_DAYS
+Number of days a module is considered \fInearly forbidden\fP prior reaching its
+expiry date set by \fI\%module\-forbid\fP modulefile command. When a \fInearly
+forbidden\fP module is evaluated a warning message is issued to inform module
+will soon be forbidden. If set to \fB0\fP, modules will never be considered
+\fInearly forbidden\fP\&. Accepted values are integers comprised between 0 and 365.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%nearly_forbidden_days\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_PAGER
+Text viewer for use to paginate message output if error output stream is
+attached to a terminal. The value of this variable is composed of a pager
+command name or path eventually followed by command\-line options.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%pager\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.sp
+If \fI\%MODULES_PAGER\fP variable is set to an empty string or to the value
+\fBcat\fP, pager will not be launched.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_PROTECTED_ENVVARS
+A colon separated list of environment variable names that should not be
+modified by any modulefile command.
+.sp
+Prevents modifications by \fI\%append\-path\fP, \fI\%prepend\-path\fP,
+\fI\%remove\-path\fP, \fI\%setenv\fP and \fI\%unsetenv\fP\&. When these
+modulefile commands attempt to modify a protected environment variable,
+a warning message is emitted and modification is ignored.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%protected_envvars\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_QUARANTINE_SUPPORT
+If set to \fB1\fP, produces the shell code for quarantine mechanism when the
+\fBautoinit\fP sub\-command generates the \fBmodule\fP shell
+function.
+.sp
+The generated shell code for quarantine mechanism indirectly passes the
+environment variable defined in \fI\%MODULES_RUN_QUARANTINE\fP to the
+\fBmodulecmd.tcl\fP script to protect its run\-time environment from
+side\-effect coming from the current definition of these variables.
+.sp
+To enable quarantine support, \fI\%MODULES_QUARANTINE_SUPPORT\fP should be
+set to \fB1\fP prior Modules initialization or the
+\fI\%quarantine_support\fP configuration should be set to \fB1\fP in the
+\fBinitrc\fP configuration file.
+.sp
+Generated code for quarantine mechanism sets the
+\fI\%__MODULES_QUARANTINE_SET\fP environment variable when calling the
+\fBmodulecmd.tcl\fP script to make it restore the environment variable put
+in quarantine.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%quarantine_support\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_REDIRECT_OUTPUT
+If set to \fB0\fP, the output generated by module command is kept on stderr and
+not redirected to stdout channel.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%redirect_output\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command. The \fI\%\-\-redirect\fP and
+\fI\%\-\-no\-redirect\fP command line switches override this environment
+variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_RESET_TARGET_STATE
+Defines behavior of \fI\%reset\fP sub\-command. When set to \fB__init__\fP,
+initial environment is restored. When set to \fB__purge__\fP, \fI\%reset\fP
+performs a \fI\%purge\fP sub\-command. Any other value designates a name
+collection to \fI\%restore\fP\&.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%reset_target_state\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_RUN_QUARANTINE
+A space separated list of environment variable names that should be passed
+indirectly to \fBmodulecmd.tcl\fP to protect its run\-time environment from
+side\-effect coming from their current definition.
+.sp
+If the quarantine mechanism has been included in \fBmodule\fP shell
+function (see \fI\%MODULES_QUARANTINE_SUPPORT\fP), each variable found in
+\fI\%MODULES_RUN_QUARANTINE\fP will have its value emptied or set to the
+value of the corresponding \fI\%MODULES_RUNENV_<VAR>\fP variable when
+defining \fBmodulecmd.tcl\fP run\-time environment.
+.sp
+Original values of these environment variables set in quarantine are passed
+to \fBmodulecmd.tcl\fP via \fI\%__MODULES_QUAR_<VAR>\fP variables.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%run_quarantine\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_RUNENV_<VAR>
+Value to set to environment variable \fB<VAR>\fP for
+\fBmodulecmd.tcl\fP run\-time execution if \fB<VAR>\fP is referred in
+\fI\%MODULES_RUN_QUARANTINE\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_SEARCH_MATCH
+When searching for modules with \fI\%avail\fP sub\-command, defines the way
+query string should match against available module names. With
+\fBstarts_with\fP value, returned modules are those whose name begins by search
+query string. When set to \fBcontains\fP, any modules whose fully qualified
+name contains search query string are returned.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%search_match\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-starts\-with\fP and
+\fI\%\-\-contains\fP command line switches override this environment
+variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_SET_SHELL_STARTUP
+If set to \fB1\fP, defines when \fBmodule\fP command initializes the shell
+startup file to ensure that the \fBmodule\fP command is still defined in
+sub\-shells. Setting shell startup file means defining the \fBENV\fP and
+\fBBASH_ENV\fP environment variable to the Modules bourne shell
+initialization script. If set to \fB0\fP, shell startup file is not defined.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%set_shell_startup\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.sp
+To enable shell startup file, \fI\%MODULES_SET_SHELL_STARTUP\fP should be
+set to \fB1\fP prior Modules initialization or the \fI\%set_shell_startup\fP
+configuration option should be set to \fB1\fP in the \fBinitrc\fP
+configuration file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_SHELLS_WITH_KSH_FPATH
+A list of shell on which the \fBFPATH\fP environment variable should be
+defined at initialization time to point to the \fBksh\-functions\fP
+directory where the ksh initialization script for module command is located.
+It enables for the listed shells to get module function defined when starting
+ksh as sub\-shell from there.
+.sp
+Accepted values are a list of shell among \fIsh\fP, \fIbash\fP, \fIcsh\fP, \fItcsh\fP and
+\fIfish\fP separated by colon character (\fB:\fP).
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%shells_with_ksh_fpath\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.sp
+To enable the setup of \fBFPATH\fP for some shells,
+\fI\%MODULES_SHELLS_WITH_KSH_FPATH\fP should be set to the list of these
+shells prior Modules initialization or the \fI\%shells_with_ksh_fpath\fP
+configuration option should be set to the list of these shells in the
+\fBinitrc\fP configuration file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_SILENT_SHELL_DEBUG
+If set to \fB1\fP, disable any \fBxtrace\fP or \fBverbose\fP debugging property set
+on current shell session for the duration of either the \fBmodule\fP
+command or the module shell initialization script. Only applies to Bourne
+Shell (sh) and its derivatives.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%silent_shell_debug\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.sp
+To generate the code to silence shell debugging property in the
+\fBmodule\fP shell function, \fI\%MODULES_SILENT_SHELL_DEBUG\fP should
+be set to \fB1\fP prior Modules initialization or the
+\fI\%silent_shell_debug\fP configuration option should be set to \fB1\fP in
+the \fBinitrc\fP configuration file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_SITECONFIG
+Location of a site\-specific configuration script to source into
+\fBmodulecmd.tcl\fP\&. See \fI\%Site\-specific configuration\fP section for
+details.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%extra_siteconfig\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. This environment variable is ignored if
+\fI\%extra_siteconfig\fP has been declared locked in
+\fI\%locked_configs\fP configuration option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_SOURCE_CACHE
+If set to \fB1\fP, cache content of files evaluated in modulefile through
+\fBsource(n)\fP Tcl command. When same file is sourced multiple times,
+cached content is reused rather reading file again.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%source_cache\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_STICKY_PURGE
+When unloading a sticky or super\-sticky module during a module
+\fI\%purge\fP, raise an \fBerror\fP or emit a \fBwarning\fP message or be
+\fBsilent\fP\&.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%sticky_purge\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_TAG_ABBREV
+Specifies the abbreviation strings used to report module tags (see \fI\%Module
+tags\fP section). Its value is a colon\-separated list of module tag names
+associated to an abbreviation string (e.g. \fItagname=abbrev\fP).
+.sp
+If a tag is associated to an empty string abbreviation, this tag will not be
+reported. In case the whole \fI\%MODULES_TAG_ABBREV\fP environment variable
+is set to an empty string, tags are reported but not abbreviated.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%tag_abbrev\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_TAG_COLOR_NAME
+Specifies the tag names or abbreviations whose graphical rendering should be
+applied over themselves instead of being applied over the name of the module
+they are attached to. Value of \fI\%MODULES_TAG_COLOR_NAME\fP is a
+colon\-separated list of module tag names or abbreviation strings (see \fI\%Module
+tags\fP section).
+.sp
+When a select graphic rendition is defined for a tag name or a tag
+abbreviation string, it is applied over the module name associated with the
+tag and tag name or abbreviation is not displayed. When listed in
+\fI\%MODULES_TAG_COLOR_NAME\fP environment variable, a tag name or
+abbreviation is displayed and select graphic rendition is applied over it.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%tag_color_name\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_TCL_LINTER
+Command name or path for use to check syntax of modulefile through the
+\fI\%lint\fP sub\-command.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%tcl_linter\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_TERM_BACKGROUND
+Inform Modules of the terminal background color to determine if the color set
+for dark background or the color set for light background should be used to
+color output in case no specific color set is defined with the
+\fI\%MODULES_COLORS\fP variable. Accepted values are \fBdark\fP and
+\fBlight\fP\&.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%term_background\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_TERM_WIDTH
+Specifies the number of columns of the output. If set to \fB0\fP, the output
+width will be the full terminal width, which is automatically detected by
+the module command. Accepted values are integers comprised between 0 and
+1000.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%term_width\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-width\fP/\fI\%\-w\fP command line
+switches override this environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_UNIQUE_NAME_LOADED
+If set to \fB1\fP, allows only one module loaded per module name. A conflict is
+raised when loading a module whose name or alternative names are shared by an
+already loaded module.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%unique_name_loaded\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_UNLOAD_MATCH_ORDER
+When a module unload request matches multiple loaded modules, unload firstly
+loaded module or lastly loaded module. Accepted values are \fBreturnfirst\fP
+and \fBreturnlast\fP\&.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%unload_match_order\fP configuration option. It can be defined with
+the \fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_VARIANT_SHORTCUT
+Specifies the shortcut characters that could be used to specify and report
+module variants (see \fI\%Module variants\fP section). Its value is a
+colon\-separated list of variant names associated to a shortcut character
+(e.g., \fIvariantname=shortcutchar\fP).
+.sp
+A variant shortcut must be of one character length and must avoid characters
+used for other concerns or in module names (i.e., \fI[\-+~/@=a\-zA\-Z0\-9]\fP).
+.sp
+If a shortcut is associated to an empty string or an invalid character, this
+shortcut definition will be ignored.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%variant_shortcut\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_VERBOSITY
+Defines the verbosity level of the module command. Available verbosity levels
+from the least to the most verbose are:
+.INDENT 7.0
+.IP \(bu 2
+\fBsilent\fP: turn off error, warning and informational messages but does not
+affect module command output result.
+.IP \(bu 2
+\fBconcise\fP: enable error and warning messages but disable informational
+messages.
+.IP \(bu 2
+\fBnormal\fP: turn on informational messages, like a report of the additional
+module evaluations triggered by loading or unloading modules, aborted
+evaluation issues or a report of each module evaluation occurring during a
+\fI\%restore\fP or \fI\%source\fP sub\-commands.
+.IP \(bu 2
+\fBverbose\fP: add additional informational messages, like a systematic
+report of the loading or unloading module evaluations.
+.IP \(bu 2
+\fBverbose2\fP: report loading or unloading module evaluations of
+hidden\-loaded modules, report if loading module is already loaded or if
+unloading module is not loaded.
+.IP \(bu 2
+\fBtrace\fP: provide details on module searches, resolutions, selections and
+evaluations.
+.IP \(bu 2
+\fBdebug\fP: print debugging messages about module command execution.
+.IP \(bu 2
+\fBdebug2\fP: report \fBmodulecmd.tcl\fP procedure calls in addition to
+printing debug messages.
+.UNINDENT
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%verbosity\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command. The \fI\%\-\-silent\fP, \fI\%\-\-verbose\fP,
+\fI\%\-\-debug\fP and \fI\%\-\-trace\fP command line switches override this
+environment variable.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULES_WA_277
+If set to \fB1\fP prior to Modules package initialization, enables workaround
+for Tcsh history issue (see \fI\%https://github.com/cea\-hpc/modules/issues/277\fP).
+This issue leads to erroneous history entries under Tcsh shell. When
+workaround is enabled, an alternative \fImodule\fP alias is defined which fixes
+the history mechanism issue. However the alternative definition of the
+\fImodule\fP alias weakens shell evaluation of the code produced by modulefiles.
+Characters with a special meaning for Tcsh shell (like \fB{\fP and \fB}\fP) may
+not be used anymore in shell alias definition otherwise the evaluation of the
+code produced by modulefiles will return a syntax error.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%wa_277\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.sp
+To enable this workaround, \fI\%MODULES_WA_277\fP should be set to \fB1\fP
+prior Modules initialization or the \fI\%wa_277\fP configuration option
+should be set to \fB1\fP in the \fBinitrc\fP configuration file.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B MODULESHOME
+The location of the main Modules package file directory containing module
+command initialization scripts, the executable program \fBmodulecmd.tcl\fP,
+and a directory containing a collection of main \fImodulefiles\fP\&.
+.sp
+This environment variable value supersedes the default value set in the
+\fI\%home\fP configuration option. It can be defined with the
+\fI\%config\fP sub\-command.
+.UNINDENT
+.SH FILES
+.sp
+\fB@prefix@\fP
+.INDENT 0.0
+.INDENT 3.5
+The \fI\%MODULESHOME\fP directory.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@etcdir@/initrc\fP
+.INDENT 0.0
+.INDENT 3.5
+The configuration file evaluated by \fBmodulecmd.tcl\fP when it initializes
+to enable the default modulepaths, load the default modules and set
+\fBmodule\fP command configuration.
+.sp
+\fBinitrc\fP is a \fI\%modulefile\fP so it is written as a Tcl script and
+defines modulepaths to enable with \fI\%module use\fP, modules to
+load with \fI\%module load\fP and configuration to apply with
+\fI\%module config\fP\&. As any modulefile \fBinitrc\fP must begin
+with the Modules magic cookie (i.e., \fB#%Module\fP file signature).
+.sp
+\fBinitrc\fP is optional. When this configuration file is present it is
+evaluated after the \fBmodulespath\fP configuration file. See the
+\fI\%Package Initialization\fP section for details.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@etcdir@/modulespath\fP
+.INDENT 0.0
+.INDENT 3.5
+The configuration file evaluated by \fBmodulecmd.tcl\fP when it initializes
+to enable the default modulepaths. This file contains the list of modulepaths
+separated by either newline or colon characters.
+.sp
+\fBmodulespath\fP is optional. When this configuration file is present it
+is evaluated before the \fBinitrc\fP configuration file. See the
+\fI\%Package Initialization\fP section for details.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@etcdir@/siteconfig.tcl\fP
+.INDENT 0.0
+.INDENT 3.5
+The site\-specific configuration script of \fBmodulecmd.tcl\fP\&. An
+additional configuration script could be defined using the
+\fI\%MODULES_SITECONFIG\fP environment variable. See \fI\%Site\-specific configuration\fP for detailed information.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@etcdir@/rc\fP
+.INDENT 0.0
+.INDENT 3.5
+The system\-wide modules rc file. The location of this file can be changed
+using the \fI\%MODULERCFILE\fP environment variable as described above.
+.UNINDENT
+.UNINDENT
+.sp
+\fB$HOME/.modulerc\fP
+.INDENT 0.0
+.INDENT 3.5
+The user specific modules rc file.
+.UNINDENT
+.UNINDENT
+.sp
+\fB$HOME/.module\fP
+.INDENT 0.0
+.INDENT 3.5
+The user specific collection directory.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@modulefilesdir@\fP
+.INDENT 0.0
+.INDENT 3.5
+The directory for system\-wide \fImodulefiles\fP\&. The location of the directory
+can be changed using the \fI\%MODULEPATH\fP environment variable as
+described above.
+.UNINDENT
+.UNINDENT
+.sp
+\fB<modulepath>/.modulerc\fP
+.INDENT 0.0
+.INDENT 3.5
+Modulepath\-specific module rc file.
+.UNINDENT
+.UNINDENT
+.sp
+\fB<modulepath>/.modulecache\fP
+.INDENT 0.0
+.INDENT 3.5
+Modulepath\-specific \fI\%module cache\fP file.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@libexecdir@/modulecmd.tcl\fP
+.INDENT 0.0
+.INDENT 3.5
+The \fImodulefile\fP interpreter that gets executed upon each invocation
+of \fBmodule\fP\&.
+.UNINDENT
+.UNINDENT
+.sp
+\fB@initdir@/<shell>\fP
+.INDENT 0.0
+.INDENT 3.5
+The Modules package initialization file sourced into the user\(aqs environment.
+.UNINDENT
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fI\%ml\fP, \fI\%modulefile\fP
+.SH COPYRIGHT
+1996-1999 John L. Furlani & Peter W. Osel, 1998-2017 R.K.Owen, 2002-2004 Mark Lakata, 2004-2017 Kent Mein, 2016-2024 Xavier Delaruelle
+.\" Generated by docutils manpage writer.
+.

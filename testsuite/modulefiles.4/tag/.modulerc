@@ -1,0 +1,162 @@
+#%Module
+if {[info exists env(TESTSUITE_FPMOD_TAG)]} {
+    switch -- $env(TESTSUITE_FPMOD_TAG) {
+        thisloc1 {
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        otherloc1 {
+            module-tag foo /other/path/to/tag/1.0
+        }
+        multi1 {
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+            module-tag bar [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        dup1 {
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        mix1 {
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+            module-tag bar tag/1.0
+        }
+        mix2dup2 {
+            module-tag bar tag/1.0
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+            module-tag foo tag/1.0
+        }
+        restrictedtag1 {
+            module-tag forbidden [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        rc3 {
+            module-tag bar tag/1.0
+        }
+        forbid1 {
+            module-forbid [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        forbid2 {
+            module-forbid --message my-forbid-msg [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        forbid3 {
+            set tomorrow [clock format [expr {[clock seconds]+86400}] -format %Y-%m-%d]
+            module-forbid --nearly-message my-nearly-forbid-msg --after $tomorrow\
+                [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        forbid4 {
+            module-forbid --message my-forbid-msg1 [file dirname $ModulesCurrentModulefile]/1.0
+            module-forbid --message my-forbid-msg2 [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        forbid5 {
+            module-forbid --message my-forbid-msg1 tag/1.0
+            module-forbid --message my-forbid-msg2 [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        forbid6 {
+            module-forbid --message my-forbid-msg2 [file dirname $ModulesCurrentModulefile]/1.0
+            module-forbid --message my-forbid-msg1 tag/1.0
+        }
+        forbid7 {
+            set tomorrow [clock format [expr {[clock seconds]+86400}] -format %Y-%m-%d]
+            set aftertomorrow [clock format [expr {[clock seconds]+(86400*2)}] -format %Y-%m-%d]
+            module-forbid --nearly-message my-nearly-forbid-msg1 --after $tomorrow\
+                [file dirname $ModulesCurrentModulefile]/1.0
+            module-forbid --nearly-message my-nearly-forbid-msg2 --after $aftertomorrow\
+                [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        forbid8 {
+            set tomorrow [clock format [expr {[clock seconds]+86400}] -format %Y-%m-%d]
+            set aftertomorrow [clock format [expr {[clock seconds]+(86400*2)}] -format %Y-%m-%d]
+            module-forbid --nearly-message my-nearly-forbid-msg1 --after $tomorrow\
+                [file dirname $ModulesCurrentModulefile]/1.0
+            module-forbid --nearly-message my-nearly-forbid-msg2 --after $aftertomorrow\
+                tag/1.0
+        }
+        forbid9 {
+            set tomorrow [clock format [expr {[clock seconds]+86400}] -format %Y-%m-%d]
+            set aftertomorrow [clock format [expr {[clock seconds]+(86400*2)}] -format %Y-%m-%d]
+            module-forbid --nearly-message my-nearly-forbid-msg2 --after $aftertomorrow\
+                tag/1.0
+            module-forbid --nearly-message my-nearly-forbid-msg1 --after $tomorrow\
+                [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        forbid10 - forbid11 {
+            module-virtual tag/1.1 ./1.0
+        }
+        hide1 {
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        hide2 {
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.1
+            module-virtual tag/1.1 ./1.0
+        }
+        hide3 {
+            module-hide --hidden-loaded [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        hide4 {
+            module-version ./1.0 1.1.sym
+            module-alias tag/1.1.al tag/1.0
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        hide5 {
+            module-version ./1.0 1.1.sym
+            module-alias tag/1.1.al tag/1.0
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.1.sym
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.1.al
+        }
+        hide6 {
+            module-version ./1.2.sub default
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.2.sub
+        }
+        hide7 {
+            module-hide [file dirname $ModulesCurrentModulefile]/1.0
+            module-hide --hard tag/1.0
+        }
+        hide8 {
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.0
+            module-hide tag/1.0
+        }
+        hide9 {
+            module-hide --hard tag/1.0
+            module-hide --hard [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        hide10 {
+            module-hide --hidden-loaded [file dirname $ModulesCurrentModulefile]/1.0
+            module-hide [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        hide11 {
+            module-hide --hidden-loaded tag/1.0
+            module-hide [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        hide12 {
+            module-hide tag/1.0
+            module-hide --hidden-loaded [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        hide13 {
+            module-hide --soft --hidden-loaded [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        info1 {
+            module-tag foo [file dirname $ModulesCurrentModulefile]/1.0
+            module-tag bar [file dirname $ModulesCurrentModulefile]/1.0
+        }
+        sticky1 {
+            module-tag sticky [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        sticky2 {
+            module-tag super-sticky [file dirname $ModulesCurrentModulefile]/1.0
+            module-virtual tag/1.1 ./1.0
+        }
+        sticky3 {
+            module-tag sticky [file dirname $ModulesCurrentModulefile]
+            module-virtual tag/1.1 ./1.0
+        }
+        sticky4 {
+            module-tag super-sticky [file dirname $ModulesCurrentModulefile]
+            module-virtual tag/1.1 ./1.0
+        }
+    }
+}

@@ -1,0 +1,5 @@
+#%Module
+set version 2.0
+
+set moduledir [file dirname $ModulesCurrentModulefile]
+source $moduledir/common

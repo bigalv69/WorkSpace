@@ -1,0 +1,795 @@
+##############################################################################
+#   Modules Release Tcl
+#   Providing a flexible user environment
+#
+#   File:		modules.61-coll/%M%
+#   Revision:		%I%
+#   First Edition:	2016/08/02
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite testsequence
+#   Command:
+#   Modulefiles:
+#   Sub-Command:
+#
+#   Comment:	%C{
+# 			This modules initializes the shell environment for the
+# 			'collection' part of the modulecmd testsuite
+#		}C%
+#
+##############################################################################
+
+if { $verbose > 1 } {
+    send_user "\tInitializing collection tests ...\n"
+}
+
+# locate HOME to test listing and restoring collections
+set homewithcoll "$env(HOME)/home"
+set homewithcollre [regsub -all "\(\[.+?\]\)" $homewithcoll {\\\1}]
+set homewithcolldotmod "$homewithcoll/.module"
+set homewithcolldotmodre [regsub -all "\(\[.+?\]\)" $homewithcolldotmod {\\\1}]
+# locate HOME to test saving collections
+set hometestcoll "$env(HOME)/hometestcoll"
+set hometestdotmod "$hometestcoll/.module"
+
+set nohomeerrmsg "$error_msgs: HOME not defined"
+
+set headercompattag "#%Module5.1\n"
+
+set collemptytarget "emptytarget"
+set colltarget "target"
+set coll1 "coll1"
+set coll2 "coll2"
+set coll3 "coll3"
+set coll4 "coll4"
+set coll4f "coll4.$colltarget"
+set colld "default"
+set collbadn "badname"
+set collbadfp "$homewithcolldotmod/$collbadn"
+set coll1fp "$homewithcolldotmod/$coll1"
+set coll1fpre "$homewithcolldotmodre/$coll1"
+set coll5fp "$homewithcoll/coll5"
+set coll5fpre "$homewithcollre/coll5"
+set coll6 "coll6"
+set coll6f "coll6.$colltarget"
+set coll7 "coll7"
+set coll7f "coll7.$colltarget"
+set coll7fp "$homewithcoll/$coll7"
+set coll7fpre "$homewithcollre/$coll7"
+set coll8 "coll8"
+set coll8f "coll8.$colltarget"
+set coll8fp "$homewithcoll/$coll8"
+set coll8fpre "$homewithcollre/$coll8"
+set coll9 "coll9"
+set coll9f "coll9.$colltarget"
+set coll9fp "$homewithcoll/$coll9"
+set coll9fpre "$homewithcollre/$coll9"
+set coll10 "coll10"
+set coll10f "coll10.$colltarget"
+set coll10fp "$homewithcoll/$coll10"
+set coll10fpre "$homewithcollre/$coll10"
+set coll11 "coll11"
+set coll11f "coll11.$colltarget"
+set coll11fp "$homewithcoll/$coll11"
+set coll11fpre "$homewithcollre/$coll11"
+set coll12 "coll12"
+set coll12f "coll12.$colltarget"
+set coll12fp "$homewithcoll/$coll12"
+set coll12fpre "$homewithcollre/$coll12"
+set coll13 "coll13"
+set coll13fp "$homewithcoll/$coll13"
+set coll13fpre "$homewithcollre/$coll13"
+set coll14 "coll14"
+set coll14fp "$homewithcoll/$coll14"
+set coll14fpre "$homewithcollre/$coll14"
+set coll15 "coll15"
+set coll15f "coll15.$colltarget"
+set coll15fp "$homewithcoll/$coll15"
+set coll15fpre "$homewithcollre/$coll15"
+set coll16 "coll16"
+set coll16f "coll16.$colltarget"
+set coll16fp "$homewithcoll/$coll16"
+set coll16fpre "$homewithcollre/$coll16"
+set coll17 coll17
+set coll17f coll17.$colltarget
+set coll17fp $hometestdotmod/$coll17f
+set coll17fpre [escre $coll17fp]
+set coll18 coll18
+set coll18f coll18.$colltarget
+set coll18fp $hometestdotmod/$coll18f
+set coll18fpre [escre $coll18fp]
+set coll19 coll19
+set coll19f coll19.$colltarget
+set coll19fp $hometestdotmod/$coll19f
+set coll19fpre [escre $coll19fp]
+set coll20 coll20
+set coll20f coll20.$colltarget
+set coll20fp $hometestdotmod/$coll20f
+set coll20fpre [escre $coll20fp]
+set coll21 coll21
+set coll21f coll21.$colltarget
+set coll21fp $hometestdotmod/$coll21f
+set coll21fpre [escre $coll21fp]
+set coll22 coll22
+set coll22f coll22.$colltarget
+set coll22fp $hometestdotmod/$coll22f
+set coll22fpre [escre $coll22fp]
+set coll23 coll23
+set coll23f coll23.$colltarget
+set coll23fp $hometestdotmod/$coll23f
+set coll23fpre [escre $coll23fp]
+set coll24 coll24
+set coll24f coll24.$colltarget
+set coll24fp $hometestdotmod/$coll24f
+set coll24fpre [escre $coll24fp]
+set coll25 coll25
+set coll25f coll25.$colltarget
+set coll25fp $hometestdotmod/$coll25f
+set coll25fpre [escre $coll25fp]
+set coll26 coll26
+set coll26fp $homewithcoll/$coll26
+set coll26fpre [escre $coll26fp]
+set coll27 coll27
+set coll27fp $homewithcoll/$coll27
+set coll27fpre [escre $coll27fp]
+set coll28 coll28
+set coll28fp $homewithcoll/$coll28
+set coll28fpre [escre $coll28fp]
+set coll29 coll29
+set coll29fp $homewithcoll/$coll29
+set coll29fpre [escre $coll29fp]
+set coll30 coll30
+set coll30fp $homewithcoll/$coll30
+set coll30fpre [escre $coll30fp]
+set coll31 coll31
+set coll31fp $homewithcoll/$coll31
+set coll31fpre [escre $coll31fp]
+set coll32 coll32
+set coll32fp $homewithcoll/$coll32
+set coll32fpre [escre $coll32fp]
+set coll33 coll33
+set coll33fp $homewithcoll/$coll33
+set coll33fpre [escre $coll33fp]
+set coll34 coll34
+set coll34f coll34.$colltarget
+set coll34fp $homewithcoll/$coll34
+set coll34fpre [escre $coll34fp]
+set coll35 coll35
+set coll35f coll35.$colltarget
+set coll35fp $hometestdotmod/$coll35f
+set coll35fpre [escre $coll35fp]
+set coll36 coll36
+set coll36f coll36.$colltarget
+set coll36fp $hometestdotmod/$coll36f
+set coll36fpre [escre $coll36fp]
+set coll37 coll37
+set coll37f coll37.$colltarget
+set coll37fp $hometestdotmod/$coll37f
+set coll37fpre [escre $coll37fp]
+set coll37pin coll37pin
+set coll37pinf coll37pin.$colltarget
+set coll37pinfp $hometestdotmod/$coll37pinf
+set coll38 coll38
+set coll38f coll38.$colltarget
+set coll38fp $hometestdotmod/$coll38f
+set coll38fpre [escre $coll38fp]
+set coll38pin coll38pin
+set coll38pinf coll38pin.$colltarget
+set coll38pinfp $hometestdotmod/$coll38pinf
+set coll39 coll39
+set coll39fp $homewithcoll/$coll39
+set coll39fpre [escre $coll39fp]
+set coll40 coll40
+set coll40fp $homewithcoll/$coll40
+set coll40fpre [escre $coll40fp]
+set coll41 coll41
+set coll41fp $homewithcoll/$coll41
+set coll41fpre [escre $coll41fp]
+set coll42 coll42
+set coll42fp $homewithcoll/$coll42
+set coll42fpre [escre $coll42fp]
+set coll43 coll43
+set coll43fp $homewithcoll/$coll43
+set coll43fpre [escre $coll43fp]
+set coll44 coll44
+set coll44f coll44.$colltarget
+set coll44fp $hometestdotmod/$coll44f
+set coll44fpre [escre $coll44fp]
+set coll44pin coll44pin
+set coll44pinf coll44pin.$colltarget
+set coll44pinfp $hometestdotmod/$coll44pinf
+set coll45 coll45
+set coll45fp $homewithcoll/$coll45
+set coll45fpre [escre $coll45fp]
+set coll46 coll46
+set coll46fp $homewithcoll/$coll46
+set coll46fpre [escre $coll46fp]
+set coll47 coll47
+set coll47f coll47.$colltarget
+set coll47fp $hometestdotmod/$coll47f
+set coll47fpre [escre $coll47fp]
+set coll48 coll48
+set coll48f coll48
+set coll48fp $homewithcolldotmod/$coll48f
+set coll48fpre [escre $coll48fp]
+set coll49 coll49
+set coll49fp $homewithcoll/$coll49
+set coll49fpre [escre $coll49fp]
+set coll50 coll50
+set coll50f coll50.$colltarget
+set coll50fp $hometestdotmod/$coll50f
+set coll50fpre [escre $coll50fp]
+
+set cdmodpath1 "$modpath"
+set cdmodpath1re "$modpathre"
+set cdmod1 "loc_rc1/1.0"
+set cdmod2 "load/15"
+set cdmod3n "verssort"
+# this modulefile is default version for module $cdmod3n
+set cdmod3 "$cdmod3n/1.10"
+set cdmod4 "coll/a"
+set cdmod5 "loc_dv2/1.0"
+set cdmod5n "loc_dv2"
+set c1modpath1 "$modpath"
+set c1modpath1re "$modpathre"
+set c1modpath2 "$modpath.2"
+set c1modpath2re "$modpathre.2"
+set c1mod5 "coll/b"
+set c1mod6 "coll/c"
+set c2modpath1 "$modpath"
+set c2modpath2 "$modpath.2"
+set c2mod4 "coll/c"
+set c2mod5 "coll/a"
+set c2mod6 "coll/b"
+set c3modpath1 "$modpath.2"
+set c3modpath2 "$modpath"
+set c4modpath1 "$modpath"
+set c4modpath1re "$modpathre"
+set c4modpath2 "$modpath.2"
+set c4modpath2re "$modpathre.2"
+set c6modpath1 "$modpath.path1"
+set c6modpath2 "$modpath.path2"
+set c6modpath3 "$modpath.path3"
+set c6mod1n "dvcross"
+set c6mod1 "$c6mod1n/dir1/1.0"
+set c6mod1f "$c6modpath1/$c6mod1n/.base"
+set c6mod2 "dcross/dir1/3.0"
+set c6mod2f "$c6modpath3/$c6mod2"
+set c6mod3 "cross/6.0"
+set c6mod3f "$c6modpath2/$c6mod3"
+set c6mod4 "novercross"
+set c6mod4f "$c6modpath1/$c6mod4"
+set c7mod1 $c6mod2f
+set c7mod1rel [regsub -all "\(\[.+?\]\)" "./testsuite/modulefiles.path3/$c6mod2" {\\\1}]
+set c7mod2 $c6mod3f
+set c7mod2rel [regsub -all "\(\[.+?\]\)" "./testsuite/modulefiles.path2/$c6mod3" {\\\1}]
+set c7mod3 $c6mod4f
+set c7mod3rel [regsub -all "\(\[.+?\]\)" "./testsuite/modulefiles.path1/$c6mod4" {\\\1}]
+set c8modpath1 $modpath
+set c8mod1 $c7mod1
+set c8mod2 $c7mod2
+set c8mod3 $c7mod3
+set c9modpath1 $modpath
+set c9mod1 $c2mod4
+set c9mod2 $c2mod5
+set c9mod3 $c2mod6
+set c11modpath1 $modpath.deps
+set c11mod1 m1
+set c11mod2 m2
+set c12modpath1 $modpath.deps
+set c12mod1 f4
+set c12mod2 f5
+set c15modpath1 "$modpath wspace"
+set c15modpath1re "$modpathre wspace"
+set c15mod1 {space yc/4}
+set c15mod2 foo/1
+set c15mod3 {space y /1 }
+set c16modpath1 "$modpath wspace"
+set c16modpath1re "$modpathre wspace"
+set c16mod1 {space yc/4}
+set c16mod2 {space yc/5}
+set c16mod3 foo/1
+set c16mod4 bar/2
+set c16mod5 {space y /1 }
+set c17modpath1 {$TESTSUITEDIR/modulefiles}
+set c17modpath1re [escre $c17modpath1]
+set c17modpath1res $modpath
+set c17mod1 loc_rc1/1.0
+set c17mod2 load/15
+set c18modpath1 $modpath.3
+set c18modpath1re [escre $c18modpath1]
+set c18mod1 variant/1.0
+set c18mod1vr [list foo=val1]
+set c18mod2 foo/1.0
+set c18mod3 variant/3.0
+set c18mod3vr [list bar=val1]
+set c19modpath1 $modpath.3
+set c19modpath1re [escre $c19modpath1]
+set c19mod1 variant/1.0
+set c19mod1vr [list {bar =} {fo o=v?l1 }]
+set c19mod2 foo/1.0
+set c19mod3 {variant/w s}
+set c19mod3vr [list {b*r= val1}]
+set c20modpath1 $modpath.3
+set c20modpath1re [escre $c20modpath1]
+set c20mod1 variant/1.0
+set c20mod1vr [list {bar =} {fo o=v?l1 }]
+set c20mod2 foo/1.0
+set c20mod3 {variant/w s}
+set c20mod3vr [list {b*r= val1}]
+set c21modpath1 $modpath.3
+set c21modpath1re [escre $c21modpath1]
+set c21mod1 variant/1.0
+set c21mod1vr [list {bar =} {fo o=v?l1 }]
+set c21mod2 foo/1.0
+set c21mod3 {variant/w s}
+set c21mod3vr [list {b*r= val1}]
+set c22modpath1 $modpath.3
+set c22modpath1re [escre $c22modpath1]
+set c22mod1 variant/1.0
+set c22mod1vr [list {fo o=v?l1 }]
+set c22mod2 foo/1.0
+set c22mod3 {variant/w s}
+set c23modpath1 $modpath.3
+set c23modpath1re [escre $c23modpath1]
+set c23mod1 variant/1.0
+set c23mod1vr [list {fo o=v?l1 }]
+set c23mod2 foo/1.0
+set c23mod3 {variant/w s}
+set c23mod3vr [list {b*r= val1}]
+set c24modpath1 $modpath.3
+set c24modpath1re [escre $c24modpath1]
+set c24mod1 variant/1.0
+set c24mod1vr [list {bar =} {fo o=v?l1 }]
+set c24mod2 foo/1.0
+set c24mod3 {variant/w s}
+set c24mod3vr [list {b*r= val1}]
+set c25modpath1 $modpath.3
+set c25modpath1re [escre $c25modpath1]
+set c25mod1 variant/1.0
+set c25mod1vr [list {bar =} {fo o=v?l1 }]
+set c25mod2 foo/1.0
+set c25mod3 {variant/w s}
+set c25mod3vr [list {b*r= val1}]
+set c26modpath1 $modpath.3
+set c26modpath1re [escre $c26modpath1]
+set c26mod1 variant/1.0
+set c26mod1vr [list {bar =} {fo o=v?l1 }]
+set c26mod2 foo/1.0
+set c26mod3 {variant/w s}
+set c26mod3vr [list {b*r= val1}]
+set c30modpath1 $modpath.3
+set c30modpath1re [escre $c30modpath1]
+set c30mod1 variant/1.0
+set c30mod1vr [list {bar=2} {foo=val2}]
+set c30mod2 foo/1.0
+set c30mod3 {variant/6.0}
+set c30mod3vr [list {bar=3} {foo=val3}]
+set c31modpath1 $modpath.3
+set c31modpath1re [escre $c31modpath1]
+set c31mod1 variant/1.0
+set c31mod1vr [list {bar=2} {foo=val2}]
+set c31mod2 foo/1.0
+set c31mod3 {variant/6.0}
+set c31mod3vr [list {bar=3} {foo=val3}]
+set c32modpath1 $modpath.3
+set c32modpath1re [escre $c32modpath1]
+set c32mod1 {variant/.w s}
+set c32mod1vr [list {bar=2} {foo=val1}]
+set c32mod1tag $c32mod1&super-sticky
+set c32mod2 foo/1.0
+set c33modpath1 $modpath.3
+set c33modpath1re [escre $c33modpath1]
+set c33mod1 {variant/.w s}
+set c33mod1vr [list {bar=2} {foo=val1}]
+set c33mod1tag $c33mod1&super-sticky
+set c33mod2 foo/1.0
+set c34modpath1 $modpath.3
+set c34modpath1re [escre $c33modpath1]
+set c34mod1 {variant/1.0}
+set c35modpath1 $modpath.3
+set c35modpath1re [escre $c33modpath1]
+set c35mod1 {variant/1.0}
+set c35mod1vr [list {+bar} {-foo}]
+set c35mod2 {variant/6.0}
+set c35mod2vr [list {-bar}]
+set c36modpath1 $modpath.3
+set c36modpath1re [escre $c36modpath1]
+set c36mod1 {variant/1.0}
+set c36mod1vr [list {foo=val1}]
+set c37modpath1 $modpath.3
+set c37modpath1re [escre $c37modpath1]
+set c37mod1 {variant/3.0}
+set c37mod1extratag [list foo]
+set c37mod1tag [list foo auto-loaded]
+set c37mod1vr [list {bar=val1}]
+set c37mod2 {tag/8.0}
+set c37mod2extratag [list foo]
+set c37mod2tag [list foo bar]
+set c38modpath1 $modpath.3
+set c38modpath1re [escre $c38modpath1]
+set c38mod1 {variant/3.0}
+set c38mod1extratag [list foo]
+set c38mod1tag [list foo auto-loaded]
+set c38mod1vr [list {bar=val1}]
+set c38mod2 {tag/8.0}
+set c38mod2extratag [list foo]
+set c38mod2tag [list bar foo]
+set c39modpath1 $modpath.3
+set c39modpath1re [escre $c39modpath1]
+set c39mod1 {tag/8.0}
+set c39mod1extratag [list foo bar]
+set c39mod1tag [list foo bar]
+set c39mod2 {foo/1.0}
+set c39mod2extratag [list foo bar]
+set c39mod2tag [list foo bar]
+set c40modpath1 $modpath.3
+set c40modpath1re [escre $c40modpath1]
+set c40mod1 {tag/8.0}
+set c40mod1extratag [list bar]
+set c40mod1tag [list bar]
+set c40mod2 {foo/1.0}
+set c41modpath1 $modpath.3
+set c41modpath1re [escre $c41modpath1]
+set c41mod1 {foo/1.0}
+set c41mod1extratag [list bar]
+set c41mod1tag [list bar]
+set c42modpath1 $modpath.3
+set c42modpath1re [escre $c42modpath1]
+set c42mod1 {foo/1.0}
+set c43modpath1 $modpath.3
+set c43modpath1re [escre $c43modpath1]
+set c43mod1 {tag/8.0}
+set c43mod1extratag [list bar]
+set c43mod1tag [list bar]
+set c43mod2 {foo/1.0}
+set c44modpath1 $modpath.3
+set c44modpath1re [escre $c44modpath1]
+set c44mod1 {foo/1.0}
+set c44mod1extratag [list foo]
+set c44mod1tag [list foo auto-loaded keep-loaded]
+set c44mod2 {tag/8.0}
+set c44mod2extratag [list bar foo]
+set c44mod2tag [list bar foo]
+set c44mod3 {bar/1.0}
+set c45modpath1 $modpath.3
+set c45modpath1re [escre $c45modpath1]
+set c45mod1 {foo/1.0}
+set c45mod1extratag [list foo nearly-forbidden]
+set c45mod1tag [list foo auto-loaded keep-loaded nearly-forbidden]
+set c45mod2 {tag/8.0}
+set c45mod2extratag [list bar foo]
+set c45mod2tag [list bar foo]
+set c45mod3 {bar/1.0}
+set c46modpath1 $modpath.3
+set c46modpath1re [escre $c46modpath1]
+set c46mod1 {foo/1.0}
+set c46mod1extratag [list foo forbidden]
+set c46mod1tag [list foo auto-loaded keep-loaded forbidden]
+set c46mod2 {tag/8.0}
+set c46mod2extratag [list bar foo]
+set c46mod2tag [list bar foo]
+set c46mod3 {bar/1.0}
+set c47modpath1 $modpath.3
+set c47modpath1re [escre $c47modpath1]
+set c47mod1 {tag/8.0}
+set c47mod1extratag [list foo]
+set c47mod1tag [list foo nearly-forbidden]
+set c49modpath1 $modpath.3
+set c49modpath1re [escre $c49modpath1]
+set c49mod1 {variant/3.0}
+set c49mod2 {tag/8.0}
+set c49mod2extratag [list foo]
+set c49mod2tag [list foo keep-loaded]
+set c49mod3 {foo/1.0}
+set c49mod3extratag [list bar]
+set c49mod3tag [list auto-loaded bar keep-loaded]
+set c49mod4 {keep/1.0}
+set c50modpath1 $modpath.4
+set c50modpath1re [escre $c50modpath1]
+set c50mod1 {tag/1.0}
+set c50mod1tag [list foo]
+
+set cdlmf "$cdmodpath1/$cdmod1:$cdmodpath1/$cdmod2:$cdmodpath1/$cdmod3:$cdmodpath1/$cdmod4:$cdmodpath1/$cdmod5"
+set cdlm "$cdmod1:$cdmod2:$cdmod3:$cdmod4:$cdmod5"
+if {[is_conf_enabled advversspec implicitdefault]} {
+    set cdlmalt "$cdmod1&loc_rc1/foo:$cdmod3&as|verssort/default&as|verssort/latest:$cdmod5&loc_dv2/default&loc_dv2"
+} else {
+    set cdlmalt "$cdmod1&loc_rc1/foo:$cdmod5&loc_dv2/default&loc_dv2"
+}
+set cdlmf_part "$cdmodpath1/$cdmod1:$cdmodpath1/$cdmod2:$cdmodpath1/$cdmod3:$cdmodpath1/$cdmod4:$cdmodpath1/$cdmod5n/2.0"
+set cdlm_part "$cdmod1:$cdmod2:$cdmod3:$cdmod4:$cdmod5n/2.0"
+if {[is_conf_enabled advversspec implicitdefault]} {
+    set cdlmalt_part "$cdmod1&loc_rc1/foo:$cdmod3&as|verssort/default&as|verssort/latest"
+} else {
+    set cdlmalt_part "$cdmod1&loc_rc1/foo"
+}
+set cdmodpath "$cdmodpath1"
+set c1lmf "$c1modpath1/$cdmod1:$c1modpath1/$cdmod2:$c1modpath1/$cdmod3:$c1modpath1/$cdmod4:$c1modpath1/$c1mod5:$c1modpath1/$c1mod6"
+set c1lm "$cdmod1:$cdmod2:$cdmod3:$cdmod4:$c1mod5:$c1mod6"
+set c1lmfnodefault "$c1modpath1/$cdmod1:$c1modpath1/$cdmod2:$c1modpath1/$cdmod4:$c1modpath1/$c1mod5:$c1modpath1/$c1mod6"
+set c1lmnodefault "$cdmod1:$cdmod2:$cdmod4:$c1mod5:$c1mod6"
+set c1lmalt $cdlmalt_part
+set c1modpath "$c1modpath1:$c1modpath2"
+set c2lmf "$c2modpath1/$cdmod1:$c2modpath1/$cdmod2:$c2modpath1/$cdmod3:$c2modpath1/$c2mod4:$c2modpath1/$c2mod5:$c2modpath1/$c2mod6"
+set c2lm "$cdmod1:$cdmod2:$cdmod3:$c2mod4:$c2mod5:$c2mod6"
+set c2lmalt $c1lmalt
+set c2modpath "$c2modpath1:$c2modpath2"
+set c3modpath "$c3modpath1:$c3modpath2"
+set c4modpath "$c4modpath1:$c4modpath2"
+set c6modpath "$c6modpath1:$c6modpath2:$c6modpath3"
+set c6lmf "$c6mod1f:$c6mod2f:$c6mod3f:$c6mod4f"
+set c6lm "$c6mod1:$c6mod2:$c6mod3:$c6mod4"
+set c6lmfnodefault "$c6mod2f:$c6mod3f:$c6mod4f"
+set c6lmnodefault "$c6mod2:$c6mod3:$c6mod4"
+if {[is_conf_enabled advversspec implicitdefault]} {
+    set c6lmalt "$c6mod1&as|dvcross/default&as|dvcross/latest&as|dvcross/dir1/default&as|dvcross/dir1/latest:$c6mod2&dcross/dir1/aft&as|dcross/default&as|dcross/latest&as|dcross/dir1/default&as|dcross/dir1/latest"
+} else {
+    set c6lmalt "$c6mod2\&dcross/dir1/aft"
+}
+set c7modpath ""
+set c7lmf "$c7mod1:$c7mod2:$c7mod3"
+set c7lm "$c7mod1:$c7mod2:$c7mod3"
+set c8modpath "$c8modpath1"
+set c8lmf $c7lmf
+set c8lm $c7lm
+set c9modpath "$c9modpath1"
+set c9lmf "$c9modpath1/$c9mod1:$c9modpath1/$c9mod2:$c9modpath1/$c9mod3"
+set c9lm "$c9mod1:$c9mod2:$c9mod3"
+set c9lmnua $c9mod2
+set c9lmtag $c9mod2&auto-loaded
+set c11modpath $c11modpath1
+set c11lmf $c11modpath1/$c11mod1:$c11modpath1/$c11mod2
+set c11lm $c11mod1:$c11mod2
+set c11lmnua $c11mod1
+set c11lmtag $c11mod1&auto-loaded
+set c12modpath $c12modpath1
+set c12lmf $c12modpath1/$c12mod1:$c12modpath1/$c12mod2
+set c12lm $c12mod1:$c12mod2
+set c13lm $cdlm
+set c13lmf $cdlmf
+set c13lmalt $cdmod1&loc_rc1/foo:$cdmod5&loc_dv2/default&loc_dv2
+set c13modpath $cdmodpath
+set c15modpath $c15modpath1
+set c15lmf $c15modpath1/$c15mod1:$c15modpath1/$c15mod2:$c15modpath1/$c15mod3
+set c15lm $c15mod1:$c15mod2:$c15mod3
+set c15lmalt {space y /1 &space y /n &al|space y /a }
+set c16modpath $c16modpath1
+set c16lmf $c15modpath1/$c16mod1:$c16modpath1/$c16mod2:$c16modpath1/$c16mod3:$c16modpath1/$c16mod4:$c16modpath1/$c16mod5
+set c16lm $c16mod1:$c16mod2:$c16mod3:$c16mod4:$c16mod5
+if {[is_conf_enabled advversspec implicitdefault]} {
+    set c16lmalt "$c16mod2&as|space yc/default&as|space yc/latest:$c16mod4&as|bar/default&as|bar/latest:space y /1 &space y /n &al|space y /a "
+} else {
+    set c16lmalt {space y /1 &space y /n &al|space y /a }
+}
+set c17lmf "$c17modpath1res/$c17mod1:$c17modpath1res/$c17mod2"
+set c17lm "$c17mod1:$c17mod2"
+set c17modpath "$c17modpath1"
+set c18lmf "$c18modpath1/$c18mod1:$c18modpath1/$c18mod2:$c18modpath1/$c18mod3"
+set c18lm "$c18mod1:$c18mod2:$c18mod3"
+set c18lmvr "$c18mod1&foo|val1|0|0:$c18mod3&bar|val1|0|0"
+set c18modpath "$c18modpath1"
+set c19lmf "$c19modpath1/$c19mod1:$c19modpath1/$c19mod2:$c19modpath1/$c19mod3"
+set c19lm "$c19mod1:$c19mod2:$c19mod3"
+set c19lmalt $c19mod3&as|variant/default&as|variant/latest
+set c19lmvr "$c19mod1&bar ||0|0&fo o|v?l1 |0|0:$c19mod3&b*r| val1|0|0"
+set c19lmvrbad1 "$c19mod1&bar ||&fo o|v?l1 |:$c19mod3&b*r| val1|"
+set c19lmvrbad2 "$c19mod1&bar ||str&fo o|v?l1 |str:$c19mod3&b*r| val1|str"
+set c19lmvrbad3 "$c19mod1&bar |&fo o|v?l1 :$c19mod2&:$c19mod3&b*r| val1"
+set c19modpath "$c19modpath1"
+set c20lmf "$c20modpath1/$c20mod1:$c20modpath1/$c20mod2:$c20modpath1/$c20mod3"
+set c20lm "$c20mod1:$c20mod2:$c20mod3"
+set c20lmalt $c20mod3&as|variant/default&as|variant/latest
+set c20lmvr "$c20mod1&bar ||0|1&fo o|v?l1 |0|0:$c20mod3&b*r| val1|0|1"
+set c20modpath "$c20modpath1"
+set c21lmf "$c21modpath1/$c21mod1:$c21modpath1/$c21mod2:$c21modpath1/$c21mod3"
+set c21lm "$c21mod1:$c21mod2:$c21mod3"
+set c21lmalt $c21mod3&as|variant/default&as|variant/latest
+set c21lmvr "$c21mod1&bar ||0|0&fo o|v?l1 |0|0:$c21mod3&b*r| val1|0|0"
+set c21lmvrbad1 "$c21mod1&bar ||&fo o|v?l1 |:$c21mod3&b*r| val1|"
+set c21lmvrbad2 "$c21mod1&bar ||str&fo o|v?l1 |str:$c21mod3&b*r| val1|str"
+set c21lmvrbad3 "$c21mod1&bar |&fo o|v?l1 :$c21mod2&:$c21mod3&b*r| val1"
+set c21modpath "$c21modpath1"
+set c22lmf "$c22modpath1/$c22mod1:$c22modpath1/$c22mod2:$c22modpath1/$c22mod3"
+set c22lm "$c22mod1:$c22mod2:$c22mod3"
+set c22lmalt $c22mod3&as|variant/default&as|variant/latest
+set c22lmvr "$c22mod1&bar ||0|2&fo o|v?l1 |0|0:$c22mod3&b*r| val1|0|2"
+set c22modpath "$c22modpath1"
+set c23lmf "$c23modpath1/$c23mod1:$c23modpath1/$c23mod2:$c23modpath1/$c23mod3"
+set c23lm "$c23mod1:$c23mod2:$c23mod3"
+set c23lmnua $c23mod1:$c23mod2
+set c23lmtag $c23mod1&auto-loaded:$c23mod2&auto-loaded
+set c23lmalt $c23mod3&as|variant/default&as|variant/latest
+set c23lmvr "$c23mod1&bar ||0|1&fo o|v?l1 |0|0:$c23mod3&b*r| val1|0|0"
+set c23modpath "$c23modpath1"
+set c24lmf "$c24modpath1/$c24mod1:$c24modpath1/$c24mod2:$c24modpath1/$c24mod3"
+set c24lm "$c24mod1:$c24mod2:$c24mod3"
+set c24lmalt $c24mod3&as|variant/default&as|variant/latest
+set c24lmnua $c24mod1:$c24mod2
+set c24lmtag $c24mod1&auto-loaded:$c24mod2&auto-loaded
+set c24lmvr "$c24mod1&bar ||0|1&fo o|v?l1 |0|0:$c24mod3&b*r| val1|0|0"
+set c24modpath "$c24modpath1"
+set c25lmf "$c25modpath1/$c25mod1:$c25modpath1/$c25mod2:$c25modpath1/$c25mod3"
+set c25lm "$c25mod1:$c25mod2:$c25mod3"
+set c25lmalt $c25mod3&as|variant/default&as|variant/latest
+set c25lmnua $c25mod1:$c25mod2
+set c25lmtag $c25mod1&auto-loaded:$c25mod2&auto-loaded
+set c25lmvr "$c25mod1&bar ||0|1&fo o|v?l1 |0|0:$c25mod3&b*r| val1|0|0"
+set c25modpath "$c25modpath1"
+set c26lmf "$c26modpath1/$c26mod1:$c26modpath1/$c26mod2:$c26modpath1/$c26mod3"
+set c26lm "$c26mod1:$c26mod2:$c26mod3"
+set c26lmalt $c26mod3&as|variant/default&as|variant/latest
+set c26lmnua $c26mod1:$c26mod2
+set c26lmtag $c26mod1&auto-loaded:$c26mod2&auto-loaded
+set c26lmvr "$c26mod1&bar ||0|1&fo o|v?l1 |0|0:$c26mod3&b*r| val1|0|1"
+set c26modpath "$c26modpath1"
+set c30lmf "$c30modpath1/$c30mod1:$c30modpath1/$c30mod2:$c30modpath1/$c30mod3"
+set c30lm "$c30mod1:$c30mod2:$c30mod3"
+set c30lmvr "$c30mod1&foo|val2|0|0&bar|2|0|1:$c30mod3&foo|val3|0|0&bar|3|0|0"
+set c30modpath "$c30modpath1"
+set c31lmf "$c31modpath1/$c31mod1:$c31modpath1/$c31mod2:$c31modpath1/$c31mod3"
+set c31lm "$c31mod1:$c31mod2:$c31mod3"
+set c31lmalt $c26mod1&variant/default&variant
+set c31lmvr "$c31mod1&foo|val2|0|0&bar|2|0|2:$c31mod3&foo|val3|0|0&bar|3|0|0"
+set c31modpath "$c31modpath1"
+set c32lmf "$c32modpath1/$c32mod1:$c32modpath1/$c32mod2"
+set c32lm "$c32mod1:$c32mod2"
+set c32lmvr "$c32mod1&foo|val1|0|0&bar|2|0|1"
+set c32modpath "$c32modpath1"
+set c33lmf "$c33modpath1/$c33mod1:$c33modpath1/$c33mod2"
+set c33lm "$c33mod1:$c33mod2"
+set c33lmvr "$c33mod1&foo|val1|0|0&bar|2|0|2"
+set c33modpath "$c33modpath1"
+set c34lmf "$c34modpath1/$c34mod1"
+set c34lm "$c34mod1"
+set c34lmvr "$c34mod1&foo|val2|0|0&foo|val2|0|1"
+set c34modpath "$c34modpath1"
+set c35lmf "$c35modpath1/$c35mod1:$c35modpath1/$c35mod2"
+set c35lm "$c35mod1:$c35mod2"
+set c35lmvr "$c35mod1&foo|0|1|0&bar|1|1|0:$c35mod2&bar|0|1|0"
+set c35modpath "$c35modpath1"
+set c36lmf "$c36modpath1/$c36mod1"
+set c36lm "$c36mod1"
+set c36lmvr "$c36mod1&foo|val1|0|0"
+set c36modpath "$c36modpath1"
+set c37lmf $c37modpath1/$c37mod1:$c37modpath1/$c37mod2
+set c37lm $c37mod1:$c37mod2
+set c37lmvr $c37mod1&bar|val1|0|0
+set c37lmextratag $c37mod1&[join $c37mod1extratag &]:$c37mod2&[join $c37mod2extratag &]
+set c37lmtag $c37mod1&[join $c37mod1tag &]:$c37mod2&[join $c37mod2tag &]
+set c37modpath $c37modpath1
+set c38lmf $c38modpath1/$c38mod1:$c38modpath1/$c38mod2
+set c38lm $c38mod1:$c38mod2
+set c38lmvr $c38mod1&bar|val1|0|0
+set c38lmextratag $c38mod1&[join $c38mod1extratag &]:$c38mod2&[join $c38mod2extratag &]
+set c38lmtag $c38mod1&[join $c38mod1tag &]:$c38mod2&[join $c38mod2tag &]
+set c38modpath $c38modpath1
+set c39lmf $c39modpath1/$c39mod1:$c39modpath1/$c39mod2
+set c39lm $c39mod1:$c39mod2
+set c39lmextratag $c39mod1&[join $c39mod1extratag &]:$c39mod2&[join $c39mod2extratag &]
+set c39lmtag $c39mod1&[join $c39mod1tag &]:$c39mod2&[join $c39mod2tag &]
+set c39modpath $c39modpath1
+set c40lmf $c40modpath1/$c40mod1:$c40modpath1/$c40mod2
+set c40lm $c40mod1:$c40mod2
+set c40lmextratag $c40mod1&[join $c40mod1extratag &]
+set c40lmtag $c40mod1&[join $c40mod1tag &]
+set c40modpath $c40modpath1
+set c41lmf $c41modpath1/$c41mod1
+set c41lm $c41mod1
+set c41lmextratag $c41mod1&[join $c41mod1extratag &]
+set c41lmtag $c41mod1&[join $c41mod1tag &]
+set c41modpath $c41modpath1
+set c42lmf $c42modpath1/$c42mod1
+set c42lm $c42mod1
+set c42modpath $c42modpath1
+set c43lmf $c43modpath1/$c43mod1:$c43modpath1/$c43mod2
+set c43lm $c43mod1:$c43mod2
+set c43lmextratag $c43mod1&[join $c43mod1extratag &]
+set c43lmtag $c43mod1&[join $c43mod1tag &]
+set c44lmf $c44modpath1/$c44mod1:$c44modpath1/$c44mod2:$c44modpath1/$c44mod3
+set c44lm $c44mod1:$c44mod2:$c44mod3
+set c44lmextratag $c44mod1&[join $c44mod1extratag &]:$c44mod2&[join $c44mod2extratag &]
+set c44lmtag $c44mod1&[join $c44mod1tag &]:$c44mod2&[join $c44mod2tag &]
+set c44modpath $c44modpath1
+set c45lmf $c45modpath1/$c45mod1:$c45modpath1/$c45mod2:$c45modpath1/$c45mod3
+set c45lm $c45mod1:$c45mod2:$c45mod3
+set c45lmextratag $c45mod1&[join $c45mod1extratag &]:$c45mod2&[join $c45mod2extratag &]
+set c45lmtag $c45mod1&[join $c45mod1tag &]:$c45mod2&[join $c45mod2tag &]
+set c45modpath $c45modpath1
+set c46lmf $c46modpath1/$c46mod3
+set c46lm $c46mod3
+set c46modpath $c46modpath1
+set c47lmf $c47modpath1/$c47mod1
+set c47lm $c47mod1
+set c47lmextratag $c47mod1&[join $c47mod1extratag &]
+set c47lmtag $c47mod1&[join $c47mod1tag &]
+set c47modpath $c47modpath1
+set c49lmf $c49modpath1/$c49mod1:$c49modpath1/$c49mod2:$c49modpath1/$c49mod3:$c49modpath1/$c49mod4
+set c49lm $c49mod1:$c49mod2:$c49mod3:$c49mod4
+set c49lmvr $c49mod1&bar|val2|0|0:$c49mod2&bar|0|1|0&foo|1|1|0
+set c49lmextratag $c49mod2&[join $c49mod2extratag &]:$c49mod3&[join $c49mod3extratag &]
+set c49lmtag $c49mod2&[join $c49mod2tag &]:$c49mod3&[join $c49mod3tag &]
+set c49modpath $c49modpath1
+set c50lmf $c50modpath1/$c50mod1
+set c50lm $c50mod1
+set c50lmtag $c50mod1&[join $c50mod1tag &]
+set c50modpath $c50modpath1
+
+set mlu "module use --append"
+set mll "module load"
+set cdcont "$mlu $cdmodpath1\n$mll $cdmod1\n$mll $cdmod2\n$mll [if_implicitdefault $cdmod3n $cdmod3]\n$mll $cdmod4\n$mll $cdmod5n\n"
+set cdcontre "$mlu $cdmodpath1re\n$mll $cdmod1\n$mll $cdmod2\n$mll [if_implicitdefault $cdmod3n $cdmod3]\n$mll $cdmod4\n$mll $cdmod5n\n"
+set cdcontpin "$mlu $cdmodpath1\n$mll $cdmod1\n$mll $cdmod2\n$mll $cdmod3\n$mll $cdmod4\n$mll $cdmod5\n"
+set cdcontrepin "$mlu $cdmodpath1re\n$mll $cdmod1\n$mll $cdmod2\n$mll $cdmod3\n$mll $cdmod4\n$mll $cdmod5\n"
+set c1cont1 "$mlu $c1modpath1\n$mlu $c1modpath2\n$mll $cdmod1\n$mll $cdmod2\n$mll [if_implicitdefault $cdmod3n $cdmod3]\n$mll $cdmod4\n$mll $c1mod5\n$mll $c1mod6\n"
+set c1cont1re "$mlu $c1modpath1re\n$mlu $c1modpath2re\n$mll $cdmod1\n$mll $cdmod2\n$mll [if_implicitdefault $cdmod3n $cdmod3]\n$mll $cdmod4\n$mll $c1mod5\n$mll $c1mod6\n"
+set presavedc1cont1re "$mlu $c1modpath1re\n$mlu $c1modpath2re\n$mll $cdmod1\n$mll $cdmod2\n$mll $cdmod3n\n$mll $cdmod4\n$mll $c1mod5\n$mll $c1mod6\n"
+set c1cont2 "$mlu $c2modpath1\n$mlu $c1modpath2\n$mll $cdmod1\n$mll $cdmod2\n$mll [if_implicitdefault $cdmod3n $cdmod3]\n$mll $c2mod4\n$mll $c2mod5\n$mll $c2mod6\n"
+set c4cont "$mlu $c4modpath1\n$mlu $c4modpath2\n"
+set c4contre "$mlu $c4modpath1re\n$mlu $c4modpath2re\n"
+set c6cont "$mlu $c6modpath1\n$mlu $c6modpath2\n$mlu $c6modpath3\n$mll [if_implicitdefault $c6mod1n $c6mod1]\n$mll $c6mod2\n$mll $c6mod3\n$mll $c6mod4\n"
+set c7cont "$mll $c7mod1\n$mll $c7mod2\n$mll $c7mod3\n"
+set c7contre "$mll $c7mod1rel\n$mll $c7mod2rel\n$mll $c7mod3rel\n"
+set c8cont "$mlu $c8modpath1\n$mll $c8mod1\n$mll $c8mod2\n$mll $c8mod3\n"
+set c9cont "$mlu $c9modpath1\n$mll $c9mod1\n$mll --tag=auto-loaded $c9mod2\n$mll $c9mod3\n"
+set c11cont "$mlu $c11modpath1\n$mll --tag=auto-loaded $c11mod1\n$mll $c11mod2\n"
+set c15cont "$mlu {$c15modpath1}\n$mll {$c15mod1}\n$mll $c15mod2\n$mll {$c15mod3}\n"
+set c15contre "$mlu {$c15modpath1re}\n$mll {$c15mod1}\n$mll $c15mod2\n$mll {$c15mod3}\n"
+set c16cont "$mlu {$c16modpath1}\n$mll {$c16mod1}\n$mll {$c16mod2}\n$mll $c16mod3\n$mll $c16mod4\n$mll {$c16mod4}\n"
+set c16contre "$mlu {$c16modpath1re}\n$mll {$c16mod1}\n$mll {$c16mod2}\n$mll $c16mod3\n$mll $c16mod4\n$mll {$c16mod5}\n"
+set c17cont "$mlu $c17modpath1\n$mll $c17mod1\n$mll $c17mod2\n"
+set c17contre "$mlu $c17modpath1re\n$mll $c17mod1\n$mll $c17mod2\n"
+set c18cont "$mlu $c18modpath1\n$mll $c18mod1 $c18mod1vr\n$mll $c18mod2\n$mll $c18mod3 $c18mod3vr\n"
+set c18contre "$mlu $c18modpath1re\n$mll $c18mod1 $c18mod1vr\n$mll $c18mod2\n$mll $c18mod3 $c18mod3vr\n"
+set c19cont "$mlu $c19modpath1\n$mll $c19mod1 $c19mod1vr\n$mll $c19mod2\n$mll {$c19mod3} $c19mod3vr\n"
+set c19contre [escre $c19cont]
+set c19contnoavs "$mlu $c19modpath1\n$mll $c19mod1\n$mll {bar =}\n$mll {fo o=v?l1 }\n$mll $c19mod2\n$mll {$c19mod3}\n$mll $c19mod3vr\n"
+set c19contnoavsre [escre $c19contnoavs]
+set c20cont "$mlu $c20modpath1\n$mll $c20mod1 $c20mod1vr\n$mll $c20mod2\n$mll {$c20mod3} $c20mod3vr\n"
+set c21cont "$mlu $c21modpath1\n$mll $c21mod1 $c21mod1vr\n$mll $c21mod2\n$mll variant $c21mod3vr\n"
+set c22cont "$mlu $c22modpath1\n$mll $c22mod1 $c22mod1vr\n$mll $c22mod2\n$mll variant\n"
+set c23cont "$mlu $c23modpath1\n$mll --tag=auto-loaded $c23mod1 $c23mod1vr\n$mll --tag=auto-loaded $c23mod2\n$mll variant $c23mod3vr\n"
+set c24cont "$mlu $c24modpath1\n$mll --tag=auto-loaded $c24mod1 $c24mod1vr\n$mll --tag=auto-loaded $c24mod2\n$mll {$c24mod3} $c24mod3vr\n"
+set c25cont "$mlu $c25modpath1\n$mll --tag=auto-loaded $c25mod1 $c25mod1vr\n$mll --tag=auto-loaded $c25mod2\n$mll {$c25mod3} $c25mod3vr\n"
+set c25contre [escre $c25cont]
+set c26cont "$mlu $c26modpath1\n$mll --tag=auto-loaded $c26mod1 $c26mod1vr\n$mll --tag=auto-loaded $c26mod2\n$mll {$c26mod3} $c26mod3vr\n"
+set c26contre [escre $c26cont]
+set c26contnoavs "$mlu $c26modpath1\n$mll --tag=auto-loaded $c26mod1\n$mll --tag=auto-loaded {bar =}\n$mll --tag=auto-loaded {fo o=v?l1 }\n$mll --tag=auto-loaded $c26mod2\n$mll {$c26mod3}\n$mll $c26mod3vr\n"
+set c26contnoavsre [escre $c26contnoavs]
+set c29cont "$mlu $c26modpath1\n$mll $c26mod1 unk=val\n$mll $c26mod2\n"
+set c29contre [escre $c29cont]
+set c34cont "$mlu $c34modpath1\n$mll $c34mod1\n"
+set c35cont "$mlu $c35modpath1\n$mll $c35mod1 $c35mod1vr\n$mll $c35mod2 $c35mod2vr\n"
+set c36cont "$mlu $c35modpath1\n$mll $c36mod1 $c36mod1vr\n"
+set c36contre [escre $c36cont]
+set c37cont "$mlu $c37modpath1\n$mll --tag=[join $c37mod1tag :] $c37mod1 $c37mod1vr\n$mll --tag=[join $c37mod2extratag :] $c37mod2\n"
+set c37contre [escre $c37cont]
+set c37pincont "$mlu $c37modpath1\n$mll --tag=[join $c37mod1tag :] $c37mod1 $c37mod1vr\n$mll --tag=[join $c37mod2tag :] $c37mod2\n"
+set c38cont "$mlu $c38modpath1\n$mll --tag=[join $c38mod1tag :] $c38mod1 $c38mod1vr\n$mll --tag=[join $c38mod2extratag :] $c38mod2\n"
+set c38contre [escre $c38cont]
+set c38pincont "$mlu $c38modpath1\n$mll --tag=[join $c38mod1tag :] $c38mod1 $c38mod1vr\n$mll --tag=[join $c38mod2tag :] $c38mod2\n"
+set c39cont "$mlu $c39modpath1\n$mll --tag=[join $c39mod1tag :] $c39mod1\n$mll --tag=[join $c39mod2tag :] $c39mod2\n"
+set c39contre [escre $c39cont]
+set c40cont "$mlu $c40modpath1\n$mll $c40mod1\n$mll $c40mod2\n"
+set c40contre [escre $c40cont]
+set c41cont "$mlu $c41modpath1\n$mll --tag=[join $c41mod1tag :] $c41mod1\n"
+set c41contre [escre $c41cont]
+set c42cont "$mlu $c42modpath1\n$mll $c42mod1\n"
+set c42contre [escre $c42cont]
+set c43cont "$mlu $c43modpath1\n$mll --tag\n$mll $c43mod1\n$mll $c43mod2\n"
+set c43contre [escre $c43cont]
+set c44cont "$mlu $c44modpath1\n$mll --tag=[join $c44mod1tag :] $c44mod1\n$mll --tag=[join $c44mod2extratag :] $c44mod2\n$mll $c44mod3\n"
+set c44contre [escre $c44cont]
+set c44pincont "$mlu $c44modpath1\n$mll --tag=[join $c44mod1tag :] $c44mod1\n$mll --tag=[join $c44mod2tag :] $c44mod2\n$mll $c44mod3\n"
+set c47cont "$mlu $c47modpath1\n$mll --tag=[join $c47mod1extratag :] $c47mod1\n"
+set c47contre [escre $c47cont]
+set c50cont "$mlu $c50modpath1\n$mll --tag=[join $c50mod1tag :] $c50mod1\n"
+set c50contre [escre $c50cont]
+
+# generate modulefiles that cannot be recorded in git repository
+create_endspace_test_modulefiles
+
+# save specific test env
+save_test_env

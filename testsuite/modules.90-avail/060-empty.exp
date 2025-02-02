@@ -1,0 +1,48 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		modules.90-avail/%M%
+#   Revision:		%I%
+#   First Edition:	95/12/06
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Jens Hamisch, Jens.Hamisch@Strawberry.COM
+#
+#   Description:	Testuite testsequence
+#   Command:		avail
+#   Modulefiles:	
+#   Sub-Command:
+#
+#   Comment:	%C{
+#			Check the module 'avail' command for not existing
+#			module files.
+#		}C%
+#
+##############################################################################
+
+#
+#  Check this only for the /bin/csh
+#
+
+
+#
+#  The tests
+#
+
+testouterr_cmd "csh" "avail wddlbrmpft" "OK" ""
+testouterr_cmd_re "csh" "avail --long wddlbrmpft" "OK" ""
+
+skip_if_quick_mode
+
+# test with a global modulerc set
+set env(MODULERCFILE) "$env(TESTSUITEDIR)/etc/modulerc"
+testouterr_cmd "csh" "avail wddlbrmpft" "OK" ""
+testouterr_cmd_re "csh" "avail --long wddlbrmpft" "OK" ""
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

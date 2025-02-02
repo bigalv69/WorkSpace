@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+#
+# MT, run all or specific parts of the test suite
+# Copyright (C) 2018-2022 Xavier Delaruelle
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+##########################################################################
+
+set -u
+
+# print help message
+echo_usage() {
+   echo "Usage: $0 [options] [testsuite] [serienum[/testfilenum]]...
+
+Run all or specific parts of the test suite
+
+Test suites:
+  modules         Test modulecmd.tcl built script (default)
+  quick           Short version of modulecmd.tcl testsuite
+  cov             Coverage mode of modulecmd.tcl testsuite
+  install         Test Modules installation
+  lint            Lint script files of this repository
+
+Select parts of testsuite:
+  serienum        Identification number of testsuite directory containing a
+                  series of testfile (e.g., '50' for modules.50-cmds dir.)
+  testfilenum     Identification number of testfile in a testserie (e.g.,
+                  '370' for 370-variant.exp testfile in modules.70-maint dir.)
+
+Options:
+  -h, --help      Show this help message and exit
+
+Examples:
+  $0
+  $0 quick
+  $0 lint
+  $0 50/37 61 70/{290,440}
+"
+}
+
+# print message on stderr then exit
+echo_error() {
+   echo -e "ERROR: $1" >&2
+   exit 1
+}
+
+if [ ! -e tcl/main.tcl.in ]; then
+   echo_error "Not in correct directory"
+fi
+
+# make bin, should use GNU make
+if command -v gmake >/dev/null; then
+   make='gmake'
+else
+   make='make'
+fi
+
+# make target
+target='test'
+testserie='modules'
+setuptestfiles=(00/005 00/006 00/010 00/050 00/060 00/080 00/085)
+if [ $# -gt 0 ]; then
+   if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+      echo_usage
+      exit 0
+   elif [ "$1" = "modules" ]; then
+      target='test'
+      testserie='modules'
+      shift
+   elif [ "$1" = "quick" ]; then
+      export QUICKTEST=1
+      shift
+   elif [ "$1" = "cov" ]; then
+      export COVERAGE=y
+      shift
+   elif [ "$1" = "install" ]; then
+      target='testinstall'
+      testserie='install'
+      setuptestfiles=(00/005 00/006 00/010 00/011)
+      shift
+   elif [ "$1" = "lint" ]; then
+      target='testlint'
+      testserie='lint'
+      setuptestfiles=(00/005 00/006 00/011)
+      shift
+   fi
+fi
+
+if [ $# -gt 0 ]; then
+   # build list of test files to run test on
+   declare -a testfiles
+   for i in "${setuptestfiles[@]}" "${@}"; do
+      j=${i##*/}
+      i=${i%/*}
+
+      # add all test files if passed a full section number or a test file
+      # from collection section (this section must be run entirely)
+      if [ "$j" == "$i" ] || [ "$i" == "61" ]; then
+         testfiles+=(testsuite/"$testserie.${i}"*/*.exp)
+      else
+         testfiles+=(testsuite"/$testserie.${i}"*/{010,999,$j}*.exp)
+      fi
+   done
+
+   # get file name of selected test files (runtest requires .exp file name)
+   declare -a testfnames=()
+   for i in "${testfiles[@]}"; do
+      if [ -e "$i" ]; then
+         fname=${i##*/}
+         # build list of unique file names
+         if [ ${#testfnames[@]} -eq 0 ]\
+            || [[ ! " ${testfnames[*]} " == *" $fname "* ]]; then
+            testfnames+=("$fname")
+         fi
+      fi
+   done
+
+   # pass list to make target
+   export RUNTESTFILES="${testfnames[*]}"
+fi
+
+# attempt to get enhanced diff tool but disable this retrieval if download
+# tentative fails
+if [ ! -e .noicdiff ]; then
+   $make icdiff || touch .noicdiff
+fi
+
+export RUNTESTFLAGS='-v -v >/dev/null 2>&1'
+$make $target
+ret=$?
+
+# highlight failed tests
+retreview=0
+if [ -e $testserie.log ]; then
+   script/mtreview $testserie.log
+   retreview+=$?
+fi
+
+# testsuite ok but mtreview failed to run
+if [ $ret -eq 0 ] && [ $retreview -ne 0 ]; then
+   ret=$retreview
+fi
+
+exit $ret
+# vim:set tabstop=3 shiftwidth=3 expandtab autoindent:

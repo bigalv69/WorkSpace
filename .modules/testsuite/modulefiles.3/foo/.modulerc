@@ -1,0 +1,34 @@
+#%Module
+
+if {[info exists env(TESTSUITE_AVAIL_OUTPUT_FOO_SYM)]} {
+    module-version foo/1.0 bar
+}
+if {[info exists env(TESTSUITE_AVAIL_OUTPUT_FOO_TAG)]} {
+    module-tag baz foo/1.0
+}
+
+module-version foo/0.2 sym
+module-tag tag foo/0.2
+
+if {[info exists env(TESTSUITE_TAG_OPT)]} {
+    switch -- $env(TESTSUITE_TAG_OPT) {
+        coll49forb {
+            module-forbid foo/1.0
+        }
+        coll49keep {
+            module-tag keep-loaded foo/1.0
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_STASH)]} {
+    switch -- $env(TESTSUITE_STASH) {
+        stash49 {
+            module-tag qux foo/1.0
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_RESET_NOW_FORBIDDEN)]} {
+    module-forbid foo/0.2
+}

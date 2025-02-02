@@ -1,0 +1,267 @@
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:       modules.50-cmds/%M%
+#   Revision:       %I%
+#   First Edition:  2017/11/23
+#   Last Mod.:      %U%, %G%
+#
+#   Authors:        Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:    Testuite testsequence
+#   Command:        load
+#   Modulefiles:    puts
+#   Sub-Command:
+#
+#   Comment:    %C{
+#           Test 'puts' sub-command
+#       }C%
+#
+##############################################################################
+
+# ensure auto symbolic versions are not set for these tests
+setenv_var MODULES_ADVANCED_VERSION_SPEC 0
+
+#
+#  The tests with various puts statement finishing with a nonewline
+#
+
+set module "puts/1"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+
+lappend ans [list set __MODULES_LMREFRESH $module]
+lappend ans [list set _LMFILES_ $modulefile]
+lappend ans [list set LOADEDMODULES $module]
+lappend ans [list set testsuite "ok"]
+lappend ans [list out "stdout"]
+lappend ans [list out "stderr"]
+lappend ans [list out "stdoutstderrtextout1"]
+lappend ans [list out "textout2textout3"]
+
+# test loading
+testouterr_cmd "ALL" "load $module" $ans "texterr1\ntexterr2texterr3"
+
+skip_if_quick_mode
+
+set ans [list]
+lappend ans [list out "stdout"]
+lappend ans [list out "stderr"]
+lappend ans [list out "stdoutstderrtextout1"]
+lappend ans [list out "textout2textout3"]
+
+# test displaying
+testouterr_cmd_re "ALL" "display $module" $ans "$modlin\n$modulefilere:\n\ntexterr1\ntexterr2texterr3\nsetenv\t\ttestsuite ok\n$modlin"
+
+
+#
+#  The tests with a newline finishing puts
+#
+
+set module "puts/2"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+
+set ans [list]
+lappend ans [list set __MODULES_LMREFRESH $module]
+lappend ans [list set _LMFILES_ $modulefile]
+lappend ans [list set LOADEDMODULES $module]
+lappend ans [list set testsuite ok]
+lappend ans [list out "textout1"]
+
+# test loading
+testouterr_cmd "ALL" "load $module" $ans ""
+
+set ans [list]
+lappend ans [list out "textout1"]
+
+# test displaying
+testouterr_cmd_re "ALL" "display $module" $ans "$modlin\n$modulefilere:\n\nsetenv\t\ttestsuite ok\n$modlin"
+
+
+#
+#  The tests with bad puts statements
+#
+
+set custom {puts foo bar bad args}
+if {[cmpversion $tclsh_version 8.6] == -1} {
+    append custom "\"
+    invoked from within
+\"if \{\[module-info mode \"load\"\] || \[module-info mode \"display\"\]\} \{
+    puts foo bar bad args
+\}"
+    set linenum 27
+} else {
+    set linenum 28
+}
+
+set module "puts/3"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+set bad_puts [msg_moderr {wrong # args: should be "puts ?-nonewline? ?channelId? string"} $custom $modulefile $linenum]
+set bad_putsdi [escre [msg_moderr {wrong # args: should be "puts ?-nonewline? ?channelId? string"} $custom $modulefile $linenum {  }]]
+
+# test loading
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $bad_puts]
+
+# test displaying
+testouterr_cmd_re "sh" "display $module" "ERR" "$modlin\n$modulefilere:\n\n$bad_putsdi\n$modlin"
+
+
+set custom {puts foo bar}
+if {[cmpversion $tclsh_version 8.6] == -1} {
+    append custom "\"
+    invoked from within
+\"if \{\[module-info mode \"load\"\] || \[module-info mode \"display\"\]\} \{
+    puts foo bar
+\}"
+    set linenum 27
+} else {
+    set linenum 28
+}
+
+set module "puts/4"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+set bad_puts [msg_moderr {can not find channel named "foo"} $custom $modulefile $linenum]
+set bad_putsdi [escre [msg_moderr {can not find channel named "foo"} $custom $modulefile $linenum {  }]]
+
+# test loading
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $bad_puts]
+
+# test displaying
+testouterr_cmd_re "sh" "display $module" "ERR" "$modlin\n$modulefilere:\n\n$bad_putsdi\n$modlin"
+
+
+set custom {puts -nonewline foo bar}
+if {[cmpversion $tclsh_version 8.6] == -1} {
+    append custom "\"
+    invoked from within
+\"if \{\[module-info mode \"load\"\] || \[module-info mode \"display\"\]\} \{
+    puts -nonewline foo bar
+\}"
+    set linenum 27
+} else {
+    set linenum 28
+}
+
+set module "puts/5"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+set bad_puts [msg_moderr {can not find channel named "foo"} $custom $modulefile $linenum]
+set bad_putsdi [escre [msg_moderr {can not find channel named "foo"} $custom $modulefile $linenum {  }]]
+
+# test loading
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $bad_puts]
+
+# test displaying
+testouterr_cmd_re "sh" "display $module" "ERR" "$modlin\n$modulefilere:\n\n$bad_putsdi\n$modlin"
+
+
+set custom {puts}
+if {[cmpversion $tclsh_version 8.6] == -1} {
+    append custom "\"
+    invoked from within
+\"if \{\[module-info mode \"load\"\] || \[module-info mode \"display\"\]\} \{
+    puts
+\}"
+    set linenum 27
+} else {
+    set linenum 28
+}
+
+set module "puts/6"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+set bad_puts [msg_moderr {wrong # args: should be "puts ?-nonewline? ?channelId? string"} $custom $modulefile $linenum]
+set bad_putsdi [escre [msg_moderr {wrong # args: should be "puts ?-nonewline? ?channelId? string"} $custom $modulefile $linenum {  }]]
+
+# test loading
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $bad_puts]
+
+# test displaying
+testouterr_cmd_re "sh" "display $module" "ERR" "$modlin\n$modulefilere:\n\n$bad_putsdi\n$modlin"
+
+
+set custom {puts -badarg stdbad texterr2}
+if {[cmpversion $tclsh_version 8.6] == -1} {
+    append custom "\"
+    invoked from within
+\"if \{\[module-info mode \"load\"\] || \[module-info mode \"display\"\]\} \{
+    puts -badarg stdbad texterr2
+\}"
+    set linenum 27
+} else {
+    set linenum 28
+}
+
+set module "puts/7"
+set modulefile "$modpath/$module"
+set modulefilere "$modpathre/$module"
+set bad_puts [msg_moderr {wrong # args: should be "puts ?-nonewline? ?channelId? string"} $custom $modulefile $linenum]
+set bad_putsdi [escre [msg_moderr {wrong # args: should be "puts ?-nonewline? ?channelId? string"} $custom $modulefile $linenum {  }]]
+
+# test loading
+testouterr_cmd "sh" "load $module" "ERR" [msg_load $module $bad_puts]
+
+# test displaying
+testouterr_cmd_re "sh" "display $module" "ERR" "$modlin\n$modulefilere:\n\n$bad_putsdi\n$modlin"
+
+
+#
+# Test writing to a file with puts command
+#
+
+set module "puts/8"
+set modulefile "$modpath/$module"
+
+set ans [list]
+lappend ans [list set __MODULES_LMREFRESH $module]
+lappend ans [list set _LMFILES_ $modulefile]
+lappend ans [list set LOADEDMODULES $module]
+lappend ans [list set testsuite ok]
+lappend ans [list out "textout1textout2\ntextout3"]
+
+testouterr_cmd "sh" "load $module" $ans ""
+
+# delete file created during test
+set fname "$env(TESTSUITEDIR)/puts"
+if {[file exists $fname]} {
+    file delete $fname
+}
+
+
+#
+# Test puts is linked to the correct interpreter when modulefile evaluation are cascaded
+#
+
+set ans [list]
+lappend ans [list set __MODULES_LMPREREQ puts/9&$module]
+lappend ans [list set __MODULES_LMREFRESH $module]
+lappend ans [list set _LMFILES_ $modulefile:$modpath/puts/9]
+lappend ans [list set LOADEDMODULES $module:puts/9]
+lappend ans [list set testsuite ok]
+lappend ans [list set __MODULES_LMTAG $module&auto-loaded]
+lappend ans [list out "textout1textout2\ntextout3"]
+
+set tserr "(.*)+
+DEBUG \\\[#2:load:puts/8\\\] execute-modulefile: puts -nonewline \\w* textout1
+DEBUG \\\[#2:load:puts/8\\\] execute-modulefile: puts \\w* textout2
+DEBUG \\\[#2:load:puts/8\\\] execute-modulefile: puts -nonewline \\w* textout3
+(.*)+"
+
+testouterr_cmd_re sh {load -D puts/9} $ans $tserr
+
+# delete file created during test
+set fname "$env(TESTSUITEDIR)/puts"
+if {[file exists $fname]} {
+    file delete $fname
+}
+
+
+#
+#  Cleanup
+#
+
+reset_test_env

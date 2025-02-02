@@ -1,0 +1,30 @@
+#%Module
+module-whatis [module-info name]
+
+if {[info exists env(TESTSUITE_TAG_OPT)]} {
+    switch -- $env(TESTSUITE_TAG_OPT) {
+        prtag12 - vrdfl10 {
+            prereq --tag=keep-loaded:foo tag/8.0
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_OPTIONAL_OPT)]} {
+    switch -- $env(TESTSUITE_OPTIONAL_OPT) {
+        prereq3 - prereq-all3 - depends-on3 - always-load3 -\
+        prereq6 - prereq-all6 - depends-on6 - always-load6 {
+            break
+        }
+        prereq4 - prereq-all4 - depends-on4 - always-load4 {
+            unk
+        }
+    }
+}
+
+if {[info exists env(TESTSUITE_EXTRA)]} {
+    switch -- $env(TESTSUITE_EXTRA) {
+        dup11 - dup12 {
+            setenv XTFOODUP value
+        }
+    }
+}

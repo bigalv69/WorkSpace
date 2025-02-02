@@ -1,0 +1,57 @@
+#%Module1.0
+
+##############################################################################
+#   Modules Revision 3.0
+#   Providing a flexible user environment
+#
+#   File:		getenv/%M%
+#   Revision:		%I%
+#   First Edition:	2017/04/28
+#   Last Mod.:		%U%, %G%
+#
+#   Authors:		Xavier Delaruelle, xavier.delaruelle@cea.fr
+#
+#   Description:	Testuite modulefile
+#   Command:
+#   Sub-Command:	getenv
+#
+#   Invocation:		load @M@, display @M@
+#   Result:	%R{
+#		}R%
+#   Comment:	%C{
+#			Check the 'getenv' command
+#		}C%
+#			
+##############################################################################
+
+setenv testsuite "[getenv TEST]"
+setenv testsuite2 [getenv TEST2 {}]
+
+if {[info exists env(TESTSUITE_GETENV)]} {
+    switch -- $env(TESTSUITE_GETENV) {
+        toomany1 {
+            setenv testsuite3 [getenv TEST {} other]
+        }
+        toomany2 {
+            setenv testsuite3 [getenv --return-value TEST {} other]
+        }
+        toofew1 {
+            setenv testsuite3 [getenv]
+        }
+        toofew2 {
+            setenv testsuite3 [getenv --return-value]
+        }
+        misplaced1 {
+            setenv testsuite3 [getenv TEST --return-value]
+        }
+        misplaced2 {
+            setenv testsuite3 [getenv TEST foo --return-value]
+        }
+        return1 {
+            setenv testsuite3 [getenv --return-value TEST]
+        }
+        return2 {
+            setenv testsuite3 [getenv --return-value TEST foo]
+        }
+    }
+}
